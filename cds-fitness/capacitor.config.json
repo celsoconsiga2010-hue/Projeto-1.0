@@ -1,0 +1,7 @@
+{
+  "appId": "com.cdsfitness.app",
+  "appName": "CDS Fitness",
+  "webDir": "www",
+  "backgroundColor": "#0b1110",
+  "ios": { "contentInset": "always" }
+}
