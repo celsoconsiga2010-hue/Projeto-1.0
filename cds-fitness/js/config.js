@@ -3,8 +3,8 @@
    A chave "anon" (publishable) é pública por desenho: a segurança vem das
    regras RLS do banco. NUNCA ponha aqui a chave "service_role". */
 window.CDS_CONFIG = {
-  SUPABASE_URL: 'https://SEU-PROJETO.supabase.co',
-  SUPABASE_ANON_KEY: 'COLE_A_CHAVE_ANON_AQUI',
+  SUPABASE_URL: 'https://rpzinxeltetkypnmjoei.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_xgGOFQkLcmegKOBXfPKlNw_aFo4uuuy',
 
   /* true: dá para entrar com nome de usuário ou e-mail (usa a função
      email_for_username do banco). false: só e-mail. */
