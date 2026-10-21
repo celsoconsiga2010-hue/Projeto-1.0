@@ -466,6 +466,81 @@ grant execute on function public.email_for_username(text)  to anon, authenticate
 grant execute on function public.username_available(text)  to anon, authenticated;
 
 -- ---------------------------------------------------------------------
+-- 5b. CICLOS DE TREINO E ATIVIDADES EXTRAS (acréscimo; não altera nenhuma
+--     tabela existente e não mexe em dados já cadastrados)
+-- ---------------------------------------------------------------------
+
+-- Ciclo de treino: sequência de treinos (A, B, C...) com prazo. As sessões
+-- NÃO são copiadas nem alteradas: o app conta as sessões concluídas a partir
+-- da data de início. Ao concluir o ciclo, um resumo fica guardado em "summary"
+-- e os treinos usados em "workouts_snapshot", então o histórico do ciclo
+-- continua completo mesmo que treinos ou sessões sejam editados ou apagados.
+create table if not exists public.training_cycles (
+  id                uuid primary key default gen_random_uuid(),
+  user_id           uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  name              text not null default 'Ciclo',
+  workout_ids       jsonb not null default '[]'::jsonb,   -- ids dos treinos, na ordem da sequência
+  rounds            int  not null default 1,              -- voltas completas da sequência
+  total_sessions    int  not null default 1,
+  start_date        date not null default current_date,
+  deadline          date not null,
+  days_per_week     int  not null default 3,
+  auto_close        boolean not null default true,
+  status            text not null default 'ativo',
+  end_date          date,
+  completion        text,                                 -- manual | auto-sessoes | auto-prazo
+  summary           jsonb,
+  workouts_snapshot jsonb not null default '[]'::jsonb,
+  handled           boolean not null default false,       -- true depois de renovar ou dispensar
+  renew_of          uuid,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  constraint tc_name_len   check (char_length(btrim(name)) between 1 and 80),
+  constraint tc_status     check (status in ('ativo', 'concluido')),
+  constraint tc_rounds     check (rounds between 1 and 52),
+  constraint tc_total      check (total_sessions between 1 and 1000),
+  constraint tc_dpw        check (days_per_week between 1 and 7),
+  constraint tc_dates      check (deadline > start_date),
+  constraint tc_ids_arr    check (jsonb_typeof(workout_ids) = 'array' and jsonb_typeof(workouts_snapshot) = 'array'),
+  constraint tc_done_end   check (status = 'ativo' or end_date is not null)
+);
+create index if not exists tc_user_idx on public.training_cycles (user_id, status, start_date desc);
+-- no máximo um ciclo em andamento por pessoa
+create unique index if not exists tc_one_active on public.training_cycles (user_id) where status = 'ativo';
+
+-- Atividades extras (futebol, corrida, natação, lutas...)
+create table if not exists public.extra_activities (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  activity_type text not null,
+  activity_date date not null default current_date,
+  duration_min  int  not null,
+  notes         text not null default '',
+  created_at    timestamptz not null default now(),
+  constraint ea_type_len check (char_length(btrim(activity_type)) between 1 and 60),
+  constraint ea_dur      check (duration_min between 1 and 600),
+  constraint ea_notes    check (char_length(notes) <= 500)
+);
+create index if not exists ea_user_idx on public.extra_activities (user_id, activity_date desc);
+
+drop trigger if exists tc_updated on public.training_cycles;
+create trigger tc_updated before update on public.training_cycles for each row execute function public.set_updated_at();
+
+alter table public.training_cycles enable row level security;
+alter table public.extra_activities enable row level security;
+
+drop policy if exists training_cycles_own on public.training_cycles;
+create policy training_cycles_own on public.training_cycles for all to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+drop policy if exists extra_activities_own on public.extra_activities;
+create policy extra_activities_own on public.extra_activities for all to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+
+revoke all on public.training_cycles, public.extra_activities from anon, public;
+grant select, insert, update, delete on public.training_cycles  to authenticated;
+grant select, insert, update, delete on public.extra_activities to authenticated;
+
+-- ---------------------------------------------------------------------
 -- 6. CATÁLOGO PADRÃO DE EXERCÍCIOS
 -- ---------------------------------------------------------------------
 insert into public.exercises (slug, name, muscle_group, secondary_groups, equipment)

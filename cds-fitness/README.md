@@ -34,6 +34,15 @@ Não tem etapa de build. São arquivos estáticos.
 
 ---
 
+## Novidades (versão 2): ciclos, atividades extras e gerador
+
+- **Gerar treino automático**: objetivo, grupos musculares, dias por semana e tempo por sessão. O resultado pode ser ajustado (trocar/remover exercícios) antes de salvar.
+- **Ciclo de treino** (aba *Ciclo*): sequência A/B/C com prazo, total de sessões, dias por semana necessários, previsão de término e progresso. Encerra sozinho (sessões concluídas ou prazo) ou manualmente; depois é possível **renovar** o treino atual ou **gerar um novo**.
+- **Atividades extras**: futebol, futevôlei, canoagem, corrida, ciclismo, natação, lutas e outras, com data e duração, aparecendo no histórico e na semana.
+- **Histórico de ciclos**: datas, sessões feitas, exercícios usados e atividades extras de cada ciclo, para comparar.
+
+**Para atualizar um banco já em uso:** abra o SQL Editor do Supabase e execute de novo o `supabase/schema.sql` inteiro. Ele é idempotente: só cria as tabelas novas (`training_cycles`, `extra_activities`) e não altera treinos, exercícios nem sessões existentes. Sem esse passo o app continua funcionando, e a aba *Ciclo* avisa que falta atualizar o banco. Depois publique os arquivos (o cache do app passa para `cds-fitness-v2`).
+
 ## Passo 1. Criar o projeto no Supabase
 
 1. Entre em [supabase.com](https://supabase.com), crie uma conta e um **New project**. Guarde a senha do banco.

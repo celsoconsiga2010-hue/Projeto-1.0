@@ -1,4 +1,4 @@
-/* Layout: logbook shell. Sidebar nav on desktop, four-tab bottom bar on phones. Dark by default, light by toggle. */
+/* Layout: logbook shell. Sidebar nav on desktop, five-tab bottom bar on phones. Dark by default, light by toggle. */
 :root{
   --bg:#0b1110; --surface:#121a18; --surface-2:#1a2522; --line:#26352f;
   --fg:#e9f1ee; --muted:#8fa59e; --accent:#35d69c; --accent-ink:#04140d; --accent-soft:rgba(53,214,156,.13);
@@ -30,7 +30,7 @@ p{margin:0}
 .shell{max-width:1160px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:0}
 .side{display:none}
 main{min-width:0;padding-block:18px 120px;display:flex;flex-direction:column;gap:18px}
-.bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);
   padding:6px max(10px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px))}
 .bottom button{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:54px;border:0;background:none;color:var(--muted);font:600 11.5px var(--body);border-radius:10px}
 .bottom button.on{color:var(--accent)}
@@ -212,3 +212,13 @@ code.k{font:500 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;backgr
   main{padding:0}
   .card,.stat{break-inside:avoid}
 }
+
+/* ciclos, extras e gerador */
+.prog{height:12px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.prog>span{display:block;height:100%;background:var(--accent);border-radius:6px}
+.pill{display:inline-flex;align-items:center;min-height:24px;padding:0 10px;border-radius:999px;font:600 12px var(--body)}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.warn-t{color:var(--warn)}
+.day.ext{border-color:var(--blue);color:var(--blue)}
+.day.ext i{background:var(--blue);border-color:var(--blue)}

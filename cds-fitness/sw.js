@@ -4,8 +4,8 @@
    - Biblioteca do Supabase e fontes: usa o cache e atualiza em segundo plano.
    - Chamadas ao Supabase (dados e login) nunca passam por aqui.
    Ao publicar uma versão nova, troque VERSION. */
-const VERSION = 'cds-fitness-v1';
-const CORE = ['./', 'index.html', 'css/app.css', 'js/theme.js', 'js/config.js', 'js/util.js', 'js/api.js', 'js/views.js', 'js/screens.js', 'js/app.js',
+const VERSION = 'cds-fitness-v2';
+const CORE = ['./', 'index.html', 'css/app.css', 'js/theme.js', 'js/config.js', 'js/util.js', 'js/api.js', 'js/views.js', 'js/screens.js', 'js/cycles.js', 'js/app.js',
   'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const CDN = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'];
 const CACHE_HOSTS = ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];

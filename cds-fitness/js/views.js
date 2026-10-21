@@ -64,7 +64,7 @@ function sessRow(s){
   return '<button class="li" data-act="openSession" data-id="'+esc(s.id)+'"><span class="grow"><span class="t">'+esc(s.workoutName)+'</span><span class="muted small">'+fmtDate(s.date)+' · '+n+' séries'+(s.durationSec?' · '+dur(s.durationSec):'')+'</span></span><span class="num-l">'+fmt(vol,0)+'<small class="muted" style="font:600 12px var(--body)"> '+unit()+'</small></span></button>';
 }
 function emptyStart(){
-  return '<div class="empty"><div><b>Você ainda não tem treinos.</b><br>Monte o seu do zero ou comece por três treinos de exemplo (peito e tríceps, costas e bíceps, pernas) e ajuste como quiser.</div><div class="row"><button class="btn primary" data-act="newWorkout">'+ic('plus','sm')+' Criar treino</button><button class="btn" data-act="seedExamples">Usar treinos de exemplo</button></div></div>';
+  return '<div class="empty"><div><b>Você ainda não tem treinos.</b><br>Monte o seu do zero ou comece por três treinos de exemplo (peito e tríceps, costas e bíceps, pernas) e ajuste como quiser.</div><div class="row"><button class="btn primary" data-act="newWorkout">'+ic('plus','sm')+' Criar treino</button><button class="btn" data-act="seedExamples">Usar treinos de exemplo</button><button class="btn" data-act="genOpen">Gerar treino automático</button></div></div>';
 }
 
 /* ============ início ============ */
@@ -78,15 +78,15 @@ function vHome(){
   else if(tw){hero='<div class="eyebrow">Treino de hoje</div><h2>'+esc(tw.name)+'</h2><div class="chips">'+(tw.muscles||[]).map(m=>'<span class="chip">'+esc(m)+'</span>').join('')+'</div><p class="muted">'+(tw.exercises||[]).length+' exercícios'+(tw.goal?' · '+esc(tw.goal):'')+(did?' · <b class="up">você já treinou hoje</b>':'')+'</p><div class="row"><button class="btn primary" data-act="startW" data-id="'+esc(tw.id)+'">'+ic('play','sm')+' Iniciar treino</button></div>'}
   else if(S.workouts.length){hero='<div class="eyebrow">Treino de hoje</div><h2>Nada programado para hoje</h2><p class="muted">Escolha um treino para começar ou programe a semana na aba Treinos.</p><div class="row"><select id="quickW" class="in" style="max-width:260px" aria-label="Treino">'+opts(S.workouts.map(w=>[w.id,w.name]),'')+'</select><button class="btn primary" data-act="startQuick">'+ic('play','sm')+' Iniciar treino</button></div>'}
   else hero='<div class="eyebrow">Treino de hoje</div><h2>Vamos montar o primeiro treino</h2>'+emptyStart();
-  const days=[0,1,2,3,4,5,6].map(i=>{const d=addDays(wk,i),has=fin.some(s=>s.date===ymd(d));return '<div class="day'+(has?' did':'')+(ymd(d)===todayStr()?' today':'')+'" title="'+d.toLocaleDateString('pt-BR')+'"><span>'+DAYS_S[(i+1)%7]+'</span><i></i></div>'}).join('');
+  const days=[0,1,2,3,4,5,6].map(i=>{const d=addDays(wk,i),has=fin.some(s=>s.date===ymd(d));return '<div class="day'+(has?' did':'')+(!has&&S.extras.some(x=>x.date===ymd(d))?' ext':'')+(ymd(d)===todayStr()?' today':'')+'" title="'+d.toLocaleDateString('pt-BR')+'"><span>'+DAYS_S[(i+1)%7]+'</span><i></i></div>'}).join('');
   const vols=fin.slice(0,10).reverse().map(s=>({label:fmtShort(s.date),v:sesVolume(s),tip:fmtDate(s.date)+' · '+s.workoutName+': '+fmt(sesVolume(s),0)+' '+unit()}));
   const rank=evolutionRank().slice(0,3),prs=personalRecords().slice(0,5);
   return '<div class="stack"><div><div class="eyebrow">'+esc(dateTxt)+'</div><h1>'+greet+', '+esc(first)+'</h1></div>'+
-   '<section class="hero" aria-label="Treino de hoje">'+hero+'</section>'+
+   '<section class="hero" aria-label="Treino de hoje">'+hero+'</section>'+homeCycle()+
    '<div class="stats"><div class="stat"><span class="eyebrow">Treinos na semana</span><span class="v">'+week.length+'<small>/ '+goal+'</small></span><span class="s">'+(week.length>=goal?'Meta da semana atingida':'Faltam '+(goal-week.length)+' para a meta')+'</span></div>'+
    '<div class="stat"><span class="eyebrow">Último treino</span><span class="v" style="font-size:26px;line-height:1.1">'+(last?esc(last.workoutName):'–')+'</span><span class="s">'+(last?fmtDate(last.date)+' · '+ago(last.date):'Nenhum treino concluído ainda')+'</span></div>'+
    '<div class="stat"><span class="eyebrow">Exercícios cadastrados</span><span class="v">'+allEx().length+'</span><span class="s">'+S.exercises.filter(e=>!e.archived).length+' criados por você</span></div></div>'+
-   '<section class="card"><div class="row between"><h3>Frequência da semana</h3><span class="muted small">Seg a Dom</span></div><div class="days">'+days+'</div></section>'+
+   '<section class="card"><div class="row between"><h3>Frequência da semana</h3><span class="muted small">Seg a Dom · azul: atividade extra</span></div><div class="days">'+days+'</div></section>'+
    '<div class="grid2"><section class="card"><h3>Volume por sessão</h3>'+(fin.length?'<p class="muted small" style="margin-top:-6px">Carga × repetições, últimas '+Math.min(10,fin.length)+' sessões</p>':'')+(fin.length?lineChart(vols,{label:'Volume por sessão',zero:true,half:true}):'<p class="empty">O gráfico aparece depois do primeiro treino finalizado.</p>')+'</section>'+
    '<section class="card"><h3>Evolução das cargas</h3>'+(rank.length?'<div class="list">'+rank.map(r=>'<button class="li" data-act="exEvo" data-id="'+esc(r.exId)+'"><span class="grow"><span class="t">'+esc(r.name)+'</span><span class="muted small tn">'+fmt(r.from,2)+' → '+fmt(r.to,2)+' '+unit()+'</span></span>'+pctTag(r.pct)+'</button>').join('')+'</div>':'<p class="muted">Complete duas sessões do mesmo exercício para ver a evolução da carga aqui.</p>')+
    '<hr class="sep"><h3>Recordes pessoais</h3>'+(prs.length?'<div class="list">'+prs.map(p=>'<div class="li"><span class="grow"><span class="t">'+esc(p.name)+'</span><span class="muted small">'+fmtDate(p.date)+'</span></span><span class="num-l">'+fmt(p.load,2)+' '+unit()+' × '+p.reps+'</span></div>').join('')+'</div>':'<p class="muted">Seus recordes aparecem conforme você registra séries.</p>')+'</section></div>'+
@@ -100,7 +100,7 @@ function vWorkouts(){
   if(cur==='exercicios')body=vCatalog();
   else if(cur==='semana')body=vWeek();
   else body=vWorkoutList();
-  return '<div class="stack"><div class="pagehead"><h1>Treinos</h1>'+(cur==='treinos'?'<button class="btn primary" data-act="newWorkout">'+ic('plus','sm')+' Novo treino</button>':cur==='exercicios'?'<button class="btn primary" data-act="newExercise">'+ic('plus','sm')+' Novo exercício</button>':'')+'</div>'+
+  return '<div class="stack"><div class="pagehead"><h1>Treinos</h1>'+(cur==='treinos'?'<div class="row"><button class="btn" data-act="genOpen">Gerar treino</button><button class="btn primary" data-act="newWorkout">'+ic('plus','sm')+' Novo treino</button></div>':cur==='exercicios'?'<button class="btn primary" data-act="newExercise">'+ic('plus','sm')+' Novo exercício</button>':'')+'</div>'+
     seg([['treinos','Meus treinos'],['semana','Semana'],['exercicios','Exercícios']],cur,'segW')+body+'</div>';
 }
 function vWorkoutList(){
@@ -229,7 +229,7 @@ function vSessions(){
   const H=S.ui.hist=S.ui.hist||{period:'all',workoutId:''};
   const rows=finished().filter(s=>inPeriod(s.date,H)&&(!H.workoutId||s.workoutId===H.workoutId));
   return '<section class="card"><div class="formgrid"><div class="field"><label for="hP">Período</label><select id="hP" class="in" data-chg="histF" data-f="period">'+opts([['7','7 dias'],['30','30 dias'],['90','90 dias'],['all','Tudo']],H.period)+'</select></div><div class="field"><label for="hW">Treino</label><select id="hW" class="in" data-chg="histF" data-f="workoutId">'+opts(S.workouts.map(w=>[w.id,w.name]),H.workoutId,'Todos')+'</select></div></div>'+
-   (rows.length?'<div class="list">'+rows.map(sessRow).join('')+'</div>':'<p class="empty">Nenhum treino concluído neste filtro.</p>')+'</section>';
+   (rows.length?'<div class="list">'+rows.map(sessRow).join('')+'</div>':'<p class="empty">Nenhum treino concluído neste filtro.</p>')+'</section>'+extrasHistCard(H);
 }
 function vSessionDetail(){
   const s=S.sessions.find(x=>x.id===S.sel);

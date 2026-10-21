@@ -85,7 +85,7 @@ function netBanner(){
   return '';
 }
 function shell(content){
-  const nav=[['home','Início','home'],['workouts','Treinos','dumb'],['history','Histórico','chart'],['profile','Perfil','user']];
+  const nav=[['home','Início','home'],['workouts','Treinos','dumb'],['cycle','Ciclo','cycle'],['history','Histórico','chart'],['profile','Perfil','user']];
   const b=n=>'<button class="'+(S.tab===n[0]?'on':'')+'" data-act="tab" data-v="'+n[0]+'"'+(S.tab===n[0]?' aria-current="page"':'')+'>'+ic(n[2])+'<span>'+n[1]+'</span></button>';
   return '<div class="shell'+(S.view==='session'?' focus':'')+'"><aside class="side"><div class="brand"><span class="logo">CDS</span>Fitness</div>'+nav.map(b).join('')+'</aside><main><div class="mobilebrand"><div class="brand" style="margin:0"><span class="logo">CDS</span>Fitness</div></div>'+netBanner()+resumeBar()+content+'</main><nav class="bottom" aria-label="Navegação principal">'+nav.map(b).join('')+'</nav></div>';
 }
@@ -94,7 +94,7 @@ function bodyHtml(){
   if(S.boot==='auth')return vAuth();
   if(S.boot==='error'||!S.profile)return vLoadError();
   const v=S.view;
-  const c=v==='workouts'?vWorkouts():v==='history'?vHistory():v==='profile'?vProfile():v==='session'&&S.session?vSession():v==='wform'&&S.draft&&S.draft.w?vWForm():v==='eform'&&S.draft&&S.draft.e?vEForm():v==='sdetail'?vSessionDetail():vHome();
+  const c=v==='workouts'?vWorkouts():v==='history'?vHistory():v==='profile'?vProfile():v==='session'&&S.session?vSession():v==='wform'&&S.draft&&S.draft.w?vWForm():v==='eform'&&S.draft&&S.draft.e?vEForm():v==='sdetail'?vSessionDetail():v==='cycle'?vCycle():v==='cform'&&S.draft&&S.draft.cy?cyForm():v==='gform'&&S.draft&&S.draft.gen?vGen():v==='cdetail'?vCDetail():vHome();
   return shell(c);
 }
 function render(){

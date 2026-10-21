@@ -41,6 +41,16 @@ function mapSessions(ss,ses,sets){
       sets:(setsBy[e.id]||[]).sort((a,b)=>a.set_number-b.set_number).map(x=>({load:Number(x.load),reps:x.reps,done:true}))}))}))
     .sort((a,b)=>String(b.startedAt).localeCompare(String(a.startedAt)));
 }
+const mapCycle=r=>({id:r.id,name:r.name,workoutIds:Array.isArray(r.workout_ids)?r.workout_ids:[],rounds:r.rounds,totalSessions:r.total_sessions,startDate:r.start_date,deadline:r.deadline,
+  daysPerWeek:r.days_per_week,autoClose:r.auto_close!==false,status:r.status,endDate:r.end_date||null,completion:r.completion||null,summary:r.summary||null,
+  workouts:Array.isArray(r.workouts_snapshot)?r.workouts_snapshot:[],handled:!!r.handled,renewOf:r.renew_of||null,createdAt:r.created_at});
+const mapExtra=r=>({id:r.id,type:r.activity_type,date:r.activity_date,durationMin:r.duration_min,notes:r.notes||'',createdAt:r.created_at});
+function cycleRow(c){
+  const m={name:'name',workoutIds:'workout_ids',rounds:'rounds',totalSessions:'total_sessions',startDate:'start_date',deadline:'deadline',daysPerWeek:'days_per_week',autoClose:'auto_close',
+    status:'status',endDate:'end_date',completion:'completion',summary:'summary',workouts:'workouts_snapshot',handled:'handled',renewOf:'renew_of'},o={};
+  Object.keys(c).forEach(k=>{if(m[k])o[m[k]]=c[k]});
+  return o;
+}
 function profilePatch(p){
   const m={name:'full_name',username:'username',goal:'goal',startDate:'start_date',weekGoal:'week_goal',rest:'rest_seconds',unit:'unit',theme:'theme',notifications:'notifications',schedule:'schedule'},o={};
   Object.keys(p).forEach(k=>{if(m[k])o[m[k]]=(k==='goal'||k==='startDate')&&p[k]===''?null:p[k]});
@@ -61,10 +71,20 @@ const api={
     if(!prof)throw {message:'Perfil não encontrado. Rode o supabase/schema.sql completo e entre de novo.',code:'NOPROFILE'};
     const all=exs.map(mapEx),look=id=>all.find(e=>e.id===id);
     const act=ss.filter(s=>s.status==='em_andamento'&&s.draft).sort((a,b)=>String(b.started_at).localeCompare(String(a.started_at)))[0];
+    /* ciclos e atividades extras: se as tabelas novas ainda não existem no banco, o resto do app segue funcionando */
+    let cycles=[],extras=[],cyclesReady=true;
+    try{[cycles,extras]=await Promise.all([api.loadCycles(),api.loadExtras()])}
+    catch(e){if(isNetErr(e))throw e;cyclesReady=false}
     return {profile:mapProfile(prof),stdEx:all.filter(e=>e.std),exercises:all.filter(e=>!e.std),
-      workouts:mapWorkouts(ws,wes,look),sessions:mapSessions(ss,ses,sets),
+      workouts:mapWorkouts(ws,wes,look),sessions:mapSessions(ss,ses,sets),cycles:cycles,extras:extras,cyclesReady:cyclesReady,
       active:act?Object.assign({},act.draft,{id:act.id}):null,ts:Date.now()};
   },
+  async loadCycles(){return (await fetchAll((a,b)=>sb.from('training_cycles').select('*').order('created_at').order('id').range(a,b))).map(mapCycle)},
+  async loadExtras(){return (await fetchAll((a,b)=>sb.from('extra_activities').select('*').order('activity_date',{ascending:false}).order('id').range(a,b))).map(mapExtra)},
+  async insertCycle(c){must(await sb.from('training_cycles').insert(cycleRow(c)))},
+  async updateCycle(id,patch){must(await sb.from('training_cycles').update(cycleRow(patch)).eq('id',id))},
+  async insertExtra(x){must(await sb.from('extra_activities').insert({activity_type:x.type,activity_date:x.date,duration_min:x.durationMin,notes:x.notes||''}))},
+  async deleteExtra(id){must(await sb.from('extra_activities').delete().eq('id',id))},
   async loadWorkouts(look){
     const [ws,wes]=await Promise.all([
       fetchAll((a,b)=>sb.from('workouts').select('*').order('created_at').order('id').range(a,b)),

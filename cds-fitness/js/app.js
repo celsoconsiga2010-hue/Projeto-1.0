@@ -78,7 +78,7 @@ async function finishSession(){
   fin.volume=sesVolume(fin);
   S.sessions=S.sessions.filter(x=>x.id!==fin.id);S.sessions.unshift(fin);
   S.session=null;localWrite(false);S.rest=null;S.ui.confirmFinish=false;S.ui.finErr='';S.sel=fin.id;
-  cacheNow();go('sdetail',{tab:'history'});toast('Treino finalizado. Bom trabalho!');
+  cacheNow();go('sdetail',{tab:'history'});toast('Treino finalizado. Bom trabalho!');autoCheck();
 }
 function restDone(quiet){
   if(!S.rest)return;S.rest=null;clearTimeout(S.restT);
@@ -144,7 +144,7 @@ function exportCsv(){
 let cacheT=null;
 function cacheNow(){
   clearTimeout(cacheT);
-  cacheT=setTimeout(()=>{if(!S.uid||!S.profile||S.offlineData)return;api.cacheSave(S.uid,{profile:S.profile,stdEx:S.stdEx,exercises:S.exercises,workouts:S.workouts,sessions:S.sessions,active:null,email:S.email,ts:Date.now()})},400);
+  cacheT=setTimeout(()=>{if(!S.uid||!S.profile||S.offlineData)return;api.cacheSave(S.uid,{profile:S.profile,stdEx:S.stdEx,exercises:S.exercises,workouts:S.workouts,sessions:S.sessions,cycles:S.cycles,extras:S.extras,cyclesReady:S.cyclesReady,active:null,email:S.email,ts:Date.now()})},400);
 }
 
 /* ============ autenticação ============ */
@@ -166,12 +166,12 @@ function authErr(e){
 }
 function resetState(){
   clearTimeout(SY.timer);clearTimeout(SY.retry);clearTimeout(S.restT);
-  Object.assign(S,{uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],session:null,rest:null,draft:null,sel:null,ui:{},view:'home',tab:'home',offlineData:false,rendered:false,loading:false,errMsg:''});
+  Object.assign(S,{uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,closing:{},session:null,rest:null,draft:null,sel:null,ui:{},view:'home',tab:'home',offlineData:false,rendered:false,loading:false,errMsg:''});
 }
 function toSignedOut(info){
   resetState();S.boot='auth';S.auth={mode:'login',f:{},err:'',info:info||'',busy:false};render();
 }
-function applyData(d){S.profile=d.profile;S.stdEx=d.stdEx;S.exercises=d.exercises;S.workouts=d.workouts;S.sessions=d.sessions}
+function applyData(d){S.profile=d.profile;S.stdEx=d.stdEx;S.exercises=d.exercises;S.workouts=d.workouts;S.sessions=d.sessions;S.cycles=d.cycles||[];S.extras=d.extras||[];S.cyclesReady=d.cyclesReady!==false}
 function bootWith(d){
   applyData(d);S.session=null;S.lastLoad=Date.now();
   const loc=localRead(),remote=d.active,already=loc&&loc.s&&d.sessions.some(x=>x.id===loc.s.id);
@@ -182,6 +182,7 @@ function bootWith(d){
   applyTheme(S.profile.theme);
   S.boot='ready';S.view='home';S.tab='home';S.draft=null;S.top=true;S.loading=false;render();
   if(S.session&&dirty&&!S.offlineData)syncNow();
+  autoCheck();
 }
 async function loadApp(user){
   if(S.loading)return;S.loading=true;
@@ -317,7 +318,7 @@ const A={
   const w=S.workouts.find(x=>x.id===d.id);if(!w)return;
   if(await safe(async()=>{await api.saveWorkout({name:(w.name+' (cópia)').slice(0,80),description:w.description,goal:w.goal,muscles:w.muscles,notes:w.notes,exercises:w.exercises.map(exPayload)});await reloadWorkouts()},'Treino duplicado.'))softRender();
  })},
- askDelW(d){S.ui.delW=d.id;render()},cancelDel(){S.ui.delW=S.ui.delE=S.ui.delS=null;render()},
+ askDelW(d){S.ui.delW=d.id;render()},cancelDel(){S.ui.delW=S.ui.delE=S.ui.delS=S.ui.delX=null;render()},
  delWorkout(d){once('delw',async()=>{
   const sc=Object.assign({},S.profile.schedule||{});Object.keys(sc).forEach(k=>{if(sc[k]===d.id)sc[k]=''});
   S.ui.delW=null;
@@ -395,6 +396,7 @@ const A={
   render();
  })}
 };
+Object.assign(A,A_CY);
 document.addEventListener('click',e=>{
   const pt=e.target.closest&&e.target.closest('.pt');if(pt){showTip(pt);return}
   const el=e.target.closest&&e.target.closest('[data-act]');if(!el||!$('#app').contains(el))return;
@@ -425,6 +427,7 @@ const C={
   S.draft.p.notifications=t.checked;
  }
 };
+Object.assign(C,C_CY);
 document.addEventListener('change',e=>{const t=e.target,k=t.dataset&&t.dataset.chg;if(k&&C[k])C[k](t)});
 document.addEventListener('input',e=>{
   const t=e.target,sc=t.dataset&&t.dataset.scope;if(!sc)return;const f=t.dataset.f,v=t.value;
@@ -437,6 +440,7 @@ document.addEventListener('input',e=>{
   else if(sc==='pf')S.draft.p[f]=v;
   else if(sc==='pw')S.draft.pw[f]=v;
   else if(sc==='sugv')S.ui.sugVal=v;
+  else if(sc==='cy'||sc==='xf')cyInput(sc,f,v);
   else if(sc==='ses'&&S.session){
     const ses=S.session;
     if(f==='notes')ses.notes=v;
