@@ -144,7 +144,7 @@ function exportCsv(){
 let cacheT=null;
 function cacheNow(){
   clearTimeout(cacheT);
-  cacheT=setTimeout(()=>{if(!S.uid||!S.profile||S.offlineData)return;api.cacheSave(S.uid,{profile:S.profile,stdEx:S.stdEx,exercises:S.exercises,workouts:S.workouts,sessions:S.sessions,cycles:S.cycles,extras:S.extras,cyclesReady:S.cyclesReady,active:null,email:S.email,ts:Date.now()})},400);
+  cacheT=setTimeout(()=>{if(!S.uid||!S.profile||S.offlineData)return;api.cacheSave(S.uid,{profile:S.profile,stdEx:S.stdEx,exercises:S.exercises,workouts:S.workouts,sessions:S.sessions,cycles:S.cycles,extras:S.extras,cyclesReady:S.cyclesReady,videos:Object.values(S.videos),videosReady:S.videosReady,active:null,email:S.email,ts:Date.now()})},400);
 }
 
 /* ============ autenticação ============ */
@@ -166,12 +166,12 @@ function authErr(e){
 }
 function resetState(){
   clearTimeout(SY.timer);clearTimeout(SY.retry);clearTimeout(S.restT);
-  Object.assign(S,{uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,closing:{},session:null,rest:null,draft:null,sel:null,ui:{},view:'home',tab:'home',offlineData:false,rendered:false,loading:false,errMsg:''});
+  Object.assign(S,{uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,videos:{},videosReady:true,closing:{},session:null,rest:null,draft:null,sel:null,ui:{},view:'home',tab:'home',offlineData:false,rendered:false,loading:false,errMsg:''});
 }
 function toSignedOut(info){
   resetState();S.boot='auth';S.auth={mode:'login',f:{},err:'',info:info||'',busy:false};render();
 }
-function applyData(d){S.profile=d.profile;S.stdEx=d.stdEx;S.exercises=d.exercises;S.workouts=d.workouts;S.sessions=d.sessions;S.cycles=d.cycles||[];S.extras=d.extras||[];S.cyclesReady=d.cyclesReady!==false}
+function applyData(d){S.profile=d.profile;S.stdEx=d.stdEx;S.exercises=d.exercises;S.workouts=d.workouts;S.sessions=d.sessions;S.cycles=d.cycles||[];S.extras=d.extras||[];S.cyclesReady=d.cyclesReady!==false;S.videos={};(d.videos||[]).forEach(v=>{S.videos[v.exerciseId]=v});S.videosReady=d.videosReady!==false}
 function bootWith(d){
   applyData(d);S.session=null;S.lastLoad=Date.now();
   const loc=localRead(),remote=d.active,already=loc&&loc.s&&d.sessions.some(x=>x.id===loc.s.id);
@@ -276,7 +276,7 @@ async function doSignOut(){
 
 /* ============ ações (cliques) ============ */
 const A={
- tab(d){S.tab=d.v;S.view=d.v;S.ui.delW=S.ui.delE=S.ui.delS=null;S.ui.wipe=false;S.ui.confirmOut=false;if(d.v==='profile'){S.draft={p:profileDraft(),pw:{a:'',b:''}};S.ui.pErr='';S.ui.pwErr=''}S.top=true;render()},
+ tab(d){S.tab=d.v;S.view=d.v;S.ui.vOpen=null;S.ui.delW=S.ui.delE=S.ui.delS=null;S.ui.wipe=false;S.ui.confirmOut=false;if(d.v==='profile'){S.draft={p:profileDraft(),pw:{a:'',b:''}};S.ui.pErr='';S.ui.pwErr=''}S.top=true;render()},
  retry(){
   if(!sb){init();return}
   S.loading=false;S.boot='loading';render();
@@ -396,7 +396,7 @@ const A={
   render();
  })}
 };
-Object.assign(A,A_CY);
+Object.assign(A,A_CY,A_VID);
 document.addEventListener('click',e=>{
   const pt=e.target.closest&&e.target.closest('.pt');if(pt){showTip(pt);return}
   const el=e.target.closest&&e.target.closest('[data-act]');if(!el||!$('#app').contains(el))return;
@@ -427,7 +427,7 @@ const C={
   S.draft.p.notifications=t.checked;
  }
 };
-Object.assign(C,C_CY);
+Object.assign(C,C_CY,C_VID);
 document.addEventListener('change',e=>{const t=e.target,k=t.dataset&&t.dataset.chg;if(k&&C[k])C[k](t)});
 document.addEventListener('input',e=>{
   const t=e.target,sc=t.dataset&&t.dataset.scope;if(!sc)return;const f=t.dataset.f,v=t.value;
@@ -440,6 +440,7 @@ document.addEventListener('input',e=>{
   else if(sc==='pf')S.draft.p[f]=v;
   else if(sc==='pw')S.draft.pw[f]=v;
   else if(sc==='sugv')S.ui.sugVal=v;
+  else if(sc==='vid'){if(S.ui.vSheet)S.ui.vSheet[f]=v}
   else if(sc==='cy'||sc==='xf')cyInput(sc,f,v);
   else if(sc==='ses'&&S.session){
     const ses=S.session;

@@ -43,6 +43,17 @@ Não tem etapa de build. São arquivos estáticos.
 
 **Para atualizar um banco já em uso:** abra o SQL Editor do Supabase e execute de novo o `supabase/schema.sql` inteiro. Ele é idempotente: só cria as tabelas novas (`training_cycles`, `extra_activities`) e não altera treinos, exercícios nem sessões existentes. Sem esse passo o app continua funcionando, e a aba *Ciclo* avisa que falta atualizar o banco. Depois publique os arquivos (o cache do app passa para `cds-fitness-v2`).
 
+## Novidades (versão 3): vídeos demonstrativos
+
+- **Campo de vídeo ao lado de cada exercício** na tela de treino (no celular ele aparece logo abaixo do nome do exercício). O vídeo só é carregado quando você toca em *Ver demonstração*.
+- **Player dentro do app**: reproduzir/pausar, barra de avanço, volume, tela cheia e botões de −10 s / +10 s. Marcar séries, adicionar séries ou digitar cargas **não reinicia** o vídeo.
+- **Como cadastrar**: toque em *Adicionar vídeo* no exercício (também no editor de treino e em Treinos › Exercícios). Aceita link do YouTube, link do Vimeo, link direto de arquivo (`.mp4`, `.webm`, `.mov`) ou upload de arquivo (até 50 MB). Dá para trocar ou remover quando quiser.
+- O vídeo fica ligado ao **exercício**, então aparece em todos os treinos que o usam, inclusive nos antigos. Exercícios padrão também podem ter vídeo (o vídeo é só seu).
+
+**Para atualizar um banco já em uso:** rode de novo o `supabase/schema.sql` inteiro no SQL Editor. Ele só cria a tabela `exercise_videos`, o bucket privado `exercise-videos` (com as regras de acesso por usuário) e não altera nada que já existe. Sem esse passo o app funciona normalmente, só não mostra o campo de vídeo.
+
+Detalhes técnicos: o `index.html` agora permite `frame-src` para `youtube-nocookie.com` e `player.vimeo.com` e `media-src https:`. O cache do app passa para `cds-fitness-v3`. Se hospedar com cabeçalho `Referrer-Policy: no-referrer`, o app já envia a referência necessária só para o player do YouTube.
+
 ## Passo 1. Criar o projeto no Supabase
 
 1. Entre em [supabase.com](https://supabase.com), crie uma conta e um **New project**. Guarde a senha do banco.

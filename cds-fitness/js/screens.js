@@ -87,7 +87,7 @@ function netBanner(){
 function shell(content){
   const nav=[['home','Início','home'],['workouts','Treinos','dumb'],['cycle','Ciclo','cycle'],['history','Histórico','chart'],['profile','Perfil','user']];
   const b=n=>'<button class="'+(S.tab===n[0]?'on':'')+'" data-act="tab" data-v="'+n[0]+'"'+(S.tab===n[0]?' aria-current="page"':'')+'>'+ic(n[2])+'<span>'+n[1]+'</span></button>';
-  return '<div class="shell'+(S.view==='session'?' focus':'')+'"><aside class="side"><div class="brand"><span class="logo">CDS</span>Fitness</div>'+nav.map(b).join('')+'</aside><main><div class="mobilebrand"><div class="brand" style="margin:0"><span class="logo">CDS</span>Fitness</div></div>'+netBanner()+resumeBar()+content+'</main><nav class="bottom" aria-label="Navegação principal">'+nav.map(b).join('')+'</nav></div>';
+  return '<div class="shell'+(S.view==='session'?' focus':'')+'"><aside class="side"><div class="brand"><span class="logo">CDS</span>Fitness</div>'+nav.map(b).join('')+'</aside><main><div class="mobilebrand"><div class="brand" style="margin:0"><span class="logo">CDS</span>Fitness</div></div>'+netBanner()+resumeBar()+content+'</main><nav class="bottom" aria-label="Navegação principal">'+nav.map(b).join('')+'</nav>'+vidSheet()+'</div>';
 }
 function bodyHtml(){
   if(S.boot==='loading')return vSplash();
@@ -99,13 +99,13 @@ function bodyHtml(){
 }
 function render(){
   const y=window.scrollY||0;
-  $('#app').innerHTML=bodyHtml();
+  vidRender($('#app'),bodyHtml());
   S.rendered=true;
   if(S.top){window.scrollTo(0,0);S.top=false}else window.scrollTo(0,y);
 }
 function softRender(){
   if(S.boot!=='ready'||!S.profile)return;
-  if(LOCK.includes(S.view))return;
+  if(LOCK.includes(S.view)||S.ui.vSheet)return;
   render();
 }
-function go(view,o){o=o||{};S.view=view;if(o.tab)S.tab=o.tab;S.top=true;render()}
+function go(view,o){o=o||{};if(view!==S.view)S.ui.vOpen=null;S.view=view;if(o.tab)S.tab=o.tab;S.top=true;render()}

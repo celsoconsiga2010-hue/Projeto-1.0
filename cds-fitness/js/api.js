@@ -44,6 +44,7 @@ function mapSessions(ss,ses,sets){
 const mapCycle=r=>({id:r.id,name:r.name,workoutIds:Array.isArray(r.workout_ids)?r.workout_ids:[],rounds:r.rounds,totalSessions:r.total_sessions,startDate:r.start_date,deadline:r.deadline,
   daysPerWeek:r.days_per_week,autoClose:r.auto_close!==false,status:r.status,endDate:r.end_date||null,completion:r.completion||null,summary:r.summary||null,
   workouts:Array.isArray(r.workouts_snapshot)?r.workouts_snapshot:[],handled:!!r.handled,renewOf:r.renew_of||null,createdAt:r.created_at});
+const mapVideo=r=>({id:r.id,exerciseId:r.exercise_id,kind:r.kind,url:r.url||'',path:r.storage_path||'',fileName:r.file_name||''});
 const mapExtra=r=>({id:r.id,type:r.activity_type,date:r.activity_date,durationMin:r.duration_min,notes:r.notes||'',createdAt:r.created_at});
 function cycleRow(c){
   const m={name:'name',workoutIds:'workout_ids',rounds:'rounds',totalSessions:'total_sessions',startDate:'start_date',deadline:'deadline',daysPerWeek:'days_per_week',autoClose:'auto_close',
@@ -75,12 +76,22 @@ const api={
     let cycles=[],extras=[],cyclesReady=true;
     try{[cycles,extras]=await Promise.all([api.loadCycles(),api.loadExtras()])}
     catch(e){if(isNetErr(e))throw e;cyclesReady=false}
+    /* vídeos demonstrativos: mesma regra, tabela nova opcional */
+    let videos=[],videosReady=true;
+    try{videos=await api.loadVideos()}
+    catch(e){if(isNetErr(e))throw e;videosReady=false}
     return {profile:mapProfile(prof),stdEx:all.filter(e=>e.std),exercises:all.filter(e=>!e.std),
-      workouts:mapWorkouts(ws,wes,look),sessions:mapSessions(ss,ses,sets),cycles:cycles,extras:extras,cyclesReady:cyclesReady,
+      workouts:mapWorkouts(ws,wes,look),sessions:mapSessions(ss,ses,sets),cycles:cycles,extras:extras,cyclesReady:cyclesReady,videos:videos,videosReady:videosReady,
       active:act?Object.assign({},act.draft,{id:act.id}):null,ts:Date.now()};
   },
   async loadCycles(){return (await fetchAll((a,b)=>sb.from('training_cycles').select('*').order('created_at').order('id').range(a,b))).map(mapCycle)},
   async loadExtras(){return (await fetchAll((a,b)=>sb.from('extra_activities').select('*').order('activity_date',{ascending:false}).order('id').range(a,b))).map(mapExtra)},
+  async loadVideos(){return (await fetchAll((a,b)=>sb.from('exercise_videos').select('*').order('id').range(a,b))).map(mapVideo)},
+  async saveVideo(exId,row){must(await sb.from('exercise_videos').upsert(Object.assign({user_id:S.uid,exercise_id:exId},row),{onConflict:'user_id,exercise_id'}))},
+  async deleteVideo(exId){must(await sb.from('exercise_videos').delete().eq('exercise_id',exId))},
+  async uploadVideo(path,file,type){const r=await sb.storage.from(VID_BUCKET).upload(path,file,{contentType:type,upsert:false,cacheControl:'3600'});if(r.error)throw r.error},
+  async removeVideoFile(path){try{await sb.storage.from(VID_BUCKET).remove([path])}catch(e){}},
+  async videoUrl(path){const r=await sb.storage.from(VID_BUCKET).createSignedUrl(path,14400);if(r.error)throw r.error;return r.data.signedUrl},
   async insertCycle(c){must(await sb.from('training_cycles').insert(cycleRow(c)))},
   async updateCycle(id,patch){must(await sb.from('training_cycles').update(cycleRow(patch)).eq('id',id))},
   async insertExtra(x){must(await sb.from('extra_activities').insert({activity_type:x.type,activity_date:x.date,duration_min:x.durationMin,notes:x.notes||''}))},

@@ -34,7 +34,9 @@ const IC={
  play:'<path d="M7 5l12 7-12 7z"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',
  back:'<path d="M15 5l-7 7 7 7"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',
  dl:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
- cycle:'<path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v4.5h-4.5"/>'
+ cycle:'<path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v4.5h-4.5"/>',
+ video:'<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3z"/>',
+ full:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'
 };
 const ic=(n,c)=>'<svg class="ic '+(c||'')+'" viewBox="0 0 24 24" aria-hidden="true">'+IC[n]+'</svg>';
 
@@ -49,7 +51,7 @@ const EQUIP=['Barra','Halteres','Máquinas','Polias','Peso corporal','Elásticos
 const GOALS=['Hipertrofia','Força','Emagrecimento','Condicionamento','Saúde geral'];
 
 /* ============ estado ============ */
-const S={boot:'loading',uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,closing:{},
+const S={boot:'loading',uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,videos:{},videosReady:true,closing:{},
  tab:'home',view:'home',seg:{workouts:'treinos',history:'sessoes'},session:null,rest:null,sync:'saved',draft:null,sel:null,
  ui:{},discarded:{},auth:{mode:'login',f:{},err:'',info:'',busy:false},online:navigator.onLine!==false,offlineData:false,installEvt:null,rendered:false,top:false,errMsg:''};
 const LOCK=['session','wform','eform','profile','cform','gform'];

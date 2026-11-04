@@ -541,6 +541,79 @@ grant select, insert, update, delete on public.training_cycles  to authenticated
 grant select, insert, update, delete on public.extra_activities to authenticated;
 
 -- ---------------------------------------------------------------------
+-- 5c. VÍDEOS DEMONSTRATIVOS DOS EXERCÍCIOS (acréscimo; não altera nenhuma
+--     tabela existente e não mexe em dados já cadastrados)
+-- ---------------------------------------------------------------------
+
+-- Um vídeo por pessoa e por exercício. Fica numa tabela própria, ligada ao id
+-- do exercício, então vale para exercícios padrão e personalizados e aparece
+-- em todos os treinos (novos e antigos) que usam aquele exercício.
+--   kind = 'link'    -> url (YouTube, Vimeo ou arquivo de vídeo direto, só https)
+--   kind = 'arquivo' -> storage_path (arquivo enviado ao bucket "exercise-videos")
+create table if not exists public.exercise_videos (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  exercise_id  uuid not null references public.exercises(id) on delete cascade,
+  kind         text not null,
+  url          text,
+  storage_path text,
+  file_name    text,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  constraint ev_one_per_exercise unique (user_id, exercise_id),
+  constraint ev_kind check (kind in ('link', 'arquivo')),
+  constraint ev_source check (
+    (kind = 'link'    and url is not null and storage_path is null) or
+    (kind = 'arquivo' and storage_path is not null and url is null)),
+  constraint ev_url  check (url is null or (char_length(url) <= 2000 and url ~* '^https://')),
+  constraint ev_path check (storage_path is null or char_length(storage_path) <= 300),
+  constraint ev_file check (file_name is null or char_length(file_name) <= 200)
+);
+create index if not exists ev_user_idx on public.exercise_videos (user_id);
+
+drop trigger if exists ev_updated on public.exercise_videos;
+create trigger ev_updated before update on public.exercise_videos for each row execute function public.set_updated_at();
+
+alter table public.exercise_videos enable row level security;
+drop policy if exists exercise_videos_own on public.exercise_videos;
+create policy exercise_videos_own on public.exercise_videos for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid())
+              and (storage_path is null or storage_path like (select auth.uid())::text || '/%'));
+
+revoke all on public.exercise_videos from anon, public;
+grant select, insert, update, delete on public.exercise_videos to authenticated;
+
+-- Armazenamento dos arquivos de vídeo (bucket privado, limite de 50 MB por
+-- arquivo; cada pessoa só enxerga a própria pasta "<id da pessoa>/...").
+-- O bloco só roda se o Storage do Supabase existir.
+do $$
+begin
+  if to_regclass('storage.buckets') is not null and to_regclass('storage.objects') is not null then
+    insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    values ('exercise-videos', 'exercise-videos', false, 52428800,
+            array['video/mp4', 'video/webm', 'video/quicktime'])
+    on conflict (id) do update
+      set public = false, file_size_limit = 52428800,
+          allowed_mime_types = array['video/mp4', 'video/webm', 'video/quicktime'];
+
+    execute 'drop policy if exists exercise_videos_select on storage.objects';
+    execute 'drop policy if exists exercise_videos_insert on storage.objects';
+    execute 'drop policy if exists exercise_videos_update on storage.objects';
+    execute 'drop policy if exists exercise_videos_delete on storage.objects';
+    execute $p$create policy exercise_videos_select on storage.objects for select to authenticated
+      using (bucket_id = 'exercise-videos' and (storage.foldername(name))[1] = (select auth.uid())::text)$p$;
+    execute $p$create policy exercise_videos_insert on storage.objects for insert to authenticated
+      with check (bucket_id = 'exercise-videos' and (storage.foldername(name))[1] = (select auth.uid())::text)$p$;
+    execute $p$create policy exercise_videos_update on storage.objects for update to authenticated
+      using (bucket_id = 'exercise-videos' and (storage.foldername(name))[1] = (select auth.uid())::text)
+      with check (bucket_id = 'exercise-videos' and (storage.foldername(name))[1] = (select auth.uid())::text)$p$;
+    execute $p$create policy exercise_videos_delete on storage.objects for delete to authenticated
+      using (bucket_id = 'exercise-videos' and (storage.foldername(name))[1] = (select auth.uid())::text)$p$;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------
 -- 6. CATÁLOGO PADRÃO DE EXERCÍCIOS
 -- ---------------------------------------------------------------------
 insert into public.exercises (slug, name, muscle_group, secondary_groups, equipment)
