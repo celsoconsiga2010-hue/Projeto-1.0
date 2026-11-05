@@ -7,6 +7,8 @@
      (marcar série, adicionar série...), então o vídeo não reinicia enquanto se registra o treino. */
 const VID_BUCKET='exercise-videos',VID_MAX=50*1024*1024,VID_TYPES={mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime'};
 const VID_FILE_RE=/\.(mp4|webm|mov|m4v|ogv)$/i;
+/* vídeo do exercício: o da própria pessoa tem prioridade; senão, o padrão do catálogo */
+const vidGet=exId=>S.videos[exId]||(S.defVideos&&S.defVideos[exId])||null;
 const VURL={}; /* cache de endereços assinados dos arquivos: caminho -> {p:Promise, exp} */
 
 /* ---------- interpretação do link ---------- */
@@ -43,6 +45,7 @@ function vidSource(v){
 }
 const vidIsEmbed=v=>{const s=vidSource(v);return s.type==='youtube'||s.type==='vimeo'};
 function vidLabel(v){
+  if(v.def)return 'Vídeo padrão do app'+(v.title?': '+v.title:'');
   if(v.kind==='arquivo')return 'Arquivo enviado'+(v.fileName?': '+v.fileName:'');
   const s=vidSource(v);
   return s.type==='youtube'?'Link do YouTube':s.type==='vimeo'?'Link do Vimeo':s.type==='file'?'Link direto de vídeo':'Link';
@@ -61,7 +64,7 @@ function vidSigned(path,fresh){
 /* ---------- HTML do campo de vídeo ---------- */
 function vidSlot(exId,name,ctx){
   if(!S.videosReady||!exId)return '';
-  const v=S.videos[exId],key=ctx==='sheet'?'sheet:'+exId:exId,k=esc(key),x=esc(exId),nm=esc(name||'exercício');
+  const v=vidGet(exId),key=ctx==='sheet'?'sheet:'+exId:exId,k=esc(key),x=esc(exId),nm=esc(name||'exercício');
   if(!v){
     if(ctx==='sheet')return '';
     return '<aside class="vslot none" data-vslot="'+k+'" aria-label="Vídeo demonstrativo de '+nm+'"><span class="vtxt">Sem vídeo demonstrativo</span><button class="btn sm ghost" data-act="vidEdit" data-vx="'+x+'">'+ic('plus','sm')+' Adicionar vídeo</button></aside>';
@@ -83,7 +86,7 @@ function vidMsg(el,text,retryKey){
   el.appendChild(d);
 }
 async function vidFill(el){
-  const key=el.dataset.vkey,exId=el.dataset.vx,v=S.videos[exId];
+  const key=el.dataset.vkey,exId=el.dataset.vx,v=vidGet(exId);
   if(!v){el.textContent='';return}
   const src=vidSource(v),auto=S.ui.vAuto===key;
   if(auto)S.ui.vAuto=null;
@@ -169,19 +172,19 @@ function vidRender(app,html){
 /* ---------- janela de cadastro: adicionar, trocar e remover ---------- */
 function vidSheet(){
   const sh=S.ui.vSheet;if(!sh)return '';
-  const v=S.videos[sh.id],nm=esc(sh.name);
+  const v=vidGet(sh.id),own=S.videos[sh.id],nm=esc(sh.name);
   const cur=v?'<div class="vcur"><div class="eyebrow">Vídeo atual</div><span class="small">'+esc(vidLabel(v))+'</span>'+(v.kind==='link'?'<span class="small muted vurl">'+esc(v.url)+'</span>':'')+'</div>'+vidSlot(sh.id,sh.name,'sheet'):'';
   const mode=sh.mode;
   const body=mode==='file'
    ?'<div class="field"><label for="vdFile">Arquivo de vídeo</label><input id="vdFile" class="in" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" data-chg="vidFile"><p class="hint">'+(sh.file?'Selecionado: <b>'+esc(sh.file.name)+'</b> ('+fmt(sh.file.size/1048576,1)+' MB)':'MP4, WebM ou MOV, até 50 MB. Prefira o Wi-Fi para enviar.')+'</p></div>'
    :'<div class="field"><label for="vdUrl">Link do vídeo</label><input id="vdUrl" class="in" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." data-scope="vid" data-f="url" value="'+esc(sh.url)+'"><p class="hint">YouTube, Vimeo ou link direto para um arquivo .mp4, .webm ou .mov. O vídeo toca aqui dentro do app.</p></div>';
-  const del=sh.confirm?'<div class="confirm"><b>Remover o vídeo de "'+nm+'"?</b><span class="small">O exercício, os treinos e o histórico continuam como estão. Só o vídeo é removido.</span><div class="row"><button class="btn danger fill sm" data-act="vidRemove"'+(sh.busy?' disabled':'')+'>Remover vídeo</button><button class="btn sm" data-act="vidCancelRemove">Cancelar</button></div></div>':'';
+  const del=sh.confirm?'<div class="confirm"><b>'+(S.defVideos[sh.id]?'Voltar ao vídeo padrão de "':'Remover o vídeo de "')+nm+'"?</b><span class="small">O exercício, os treinos e o histórico continuam como estão. Só o seu vídeo é removido.</span><div class="row"><button class="btn danger fill sm" data-act="vidRemove"'+(sh.busy?' disabled':'')+'>'+(S.defVideos[sh.id]?'Voltar ao padrão':'Remover vídeo')+'</button><button class="btn sm" data-act="vidCancelRemove">Cancelar</button></div></div>':'';
   return '<div class="sheet-back" data-act="vidSheetBg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Vídeo demonstrativo de '+nm+'"><div class="row between"><h3>Vídeo demonstrativo</h3><button class="btn sm" data-act="vidSheetClose">Fechar</button></div>'+
    '<div class="scroll vsheet"><p class="muted small">Exercício: <b>'+nm+'</b>. O vídeo vale para este exercício em todos os treinos, inclusive nos antigos.</p>'+cur+
-   '<div class="eyebrow">'+(v?'Substituir por':'Adicionar')+'</div>'+
+   '<div class="eyebrow">'+(v?'Usar o meu vídeo no lugar':'Adicionar')+'</div>'+
    '<div class="seg" role="group" aria-label="Origem do vídeo"><button class="'+(mode==='link'?'on':'')+'" aria-pressed="'+(mode==='link')+'" data-act="vidMode" data-v="link">Link</button><button class="'+(mode==='file'?'on':'')+'" aria-pressed="'+(mode==='file')+'" data-act="vidMode" data-v="file">Arquivo</button></div>'+
    body+(sh.err?'<p class="err" role="alert">'+esc(sh.err)+'</p>':'')+
-   '<div class="row"><button class="btn primary" data-act="vidSave"'+(sh.busy?' disabled':'')+'>'+(sh.busy?(mode==='file'?'Enviando…':'Salvando…'):(v?'Substituir vídeo':'Salvar vídeo'))+'</button>'+(v&&!sh.confirm?'<button class="btn danger ghost" data-act="vidAskRemove"'+(sh.busy?' disabled':'')+'>Remover vídeo</button>':'')+'</div>'+del+'</div></div></div>';
+   '<div class="row"><button class="btn primary" data-act="vidSave"'+(sh.busy?' disabled':'')+'>'+(sh.busy?(mode==='file'?'Enviando…':'Salvando…'):(v?(own?'Substituir vídeo':'Usar este vídeo'):'Salvar vídeo'))+'</button>'+(own&&!sh.confirm?'<button class="btn danger ghost" data-act="vidAskRemove"'+(sh.busy?' disabled':'')+'>'+(S.defVideos[sh.id]?'Voltar ao vídeo padrão':'Remover vídeo')+'</button>':'')+'</div>'+del+'</div></div></div>';
 }
 function vidOpenSheet(exId){
   const ex=exById(exId),v=S.videos[exId];
@@ -224,7 +227,7 @@ async function vidSave(){
   cacheNow();
   const wasSheetKey='sheet:'+sh.id;
   if(S.ui.vOpen===sh.id||S.ui.vOpen===wasSheetKey)S.ui.vOpen=null;
-  S.ui.vSheet=null;render();toast(old?'Vídeo substituído.':'Vídeo adicionado.');
+  S.ui.vSheet=null;render();toast(old?'Vídeo substituído.':'Vídeo salvo.');
 }
 async function vidRemove(){
   const sh=S.ui.vSheet,v=sh&&S.videos[sh.id];if(!sh||!v||sh.busy)return;
@@ -233,7 +236,7 @@ async function vidRemove(){
   if(v.kind==='arquivo'&&v.path){api.removeVideoFile(v.path);delete VURL[v.path]}
   delete S.videos[sh.id];cacheNow();
   if(S.ui.vOpen===sh.id||S.ui.vOpen==='sheet:'+sh.id)S.ui.vOpen=null;
-  S.ui.vSheet=null;render();toast('Vídeo removido.');
+  S.ui.vSheet=null;render();toast(S.defVideos[sh.id]?'Voltando ao vídeo padrão.':'Vídeo removido.');
 }
 function vidEl(key,sel){const b=[...document.querySelectorAll('.vpl[data-vkey]')].find(e=>e.dataset.vkey===key);return b?b.querySelector(sel||'video,iframe'):null}
 

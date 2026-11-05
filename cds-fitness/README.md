@@ -48,9 +48,10 @@ Não tem etapa de build. São arquivos estáticos.
 - **Campo de vídeo ao lado de cada exercício** na tela de treino (no celular ele aparece logo abaixo do nome do exercício). O vídeo só é carregado quando você toca em *Ver demonstração*.
 - **Player dentro do app**: reproduzir/pausar, barra de avanço, volume, tela cheia e botões de −10 s / +10 s. Marcar séries, adicionar séries ou digitar cargas **não reinicia** o vídeo.
 - **Como cadastrar**: toque em *Adicionar vídeo* no exercício (também no editor de treino e em Treinos › Exercícios). Aceita link do YouTube, link do Vimeo, link direto de arquivo (`.mp4`, `.webm`, `.mov`) ou upload de arquivo (até 50 MB). Dá para trocar ou remover quando quiser.
+- **Vídeos prontos no catálogo**: os 46 exercícios padrão já vêm com um vídeo de demonstração em português (links públicos do YouTube de terceiros, tocados pelo player oficial dentro do app). Quem quiser pode trocar pelo próprio vídeo, e o botão *Voltar ao vídeo padrão* desfaz a troca. Para trocar um vídeo padrão para todos, edite a tabela `exercise_default_videos` no Supabase (a lista está na seção 6b do `schema.sql`). Se algum vídeo sair do ar ou bloquear a exibição em outros sites, é só trocar o link ali.
 - O vídeo fica ligado ao **exercício**, então aparece em todos os treinos que o usam, inclusive nos antigos. Exercícios padrão também podem ter vídeo (o vídeo é só seu).
 
-**Para atualizar um banco já em uso:** rode de novo o `supabase/schema.sql` inteiro no SQL Editor. Ele só cria a tabela `exercise_videos`, o bucket privado `exercise-videos` (com as regras de acesso por usuário) e não altera nada que já existe. Sem esse passo o app funciona normalmente, só não mostra o campo de vídeo.
+**Para atualizar um banco já em uso:** rode de novo o `supabase/schema.sql` inteiro no SQL Editor. Ele só cria as tabelas `exercise_videos` e `exercise_default_videos`, o bucket privado `exercise-videos` (com as regras de acesso por usuário) e não altera nada que já existe. Sem esse passo o app funciona normalmente, só não mostra o campo de vídeo.
 
 Detalhes técnicos: o `index.html` agora permite `frame-src` para `youtube-nocookie.com` e `player.vimeo.com` e `media-src https:`. O cache do app passa para `cds-fitness-v3`. Se hospedar com cabeçalho `Referrer-Policy: no-referrer`, o app já envia a referência necessária só para o player do YouTube.
 

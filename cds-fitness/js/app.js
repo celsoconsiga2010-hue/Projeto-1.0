@@ -144,7 +144,7 @@ function exportCsv(){
 let cacheT=null;
 function cacheNow(){
   clearTimeout(cacheT);
-  cacheT=setTimeout(()=>{if(!S.uid||!S.profile||S.offlineData)return;api.cacheSave(S.uid,{profile:S.profile,stdEx:S.stdEx,exercises:S.exercises,workouts:S.workouts,sessions:S.sessions,cycles:S.cycles,extras:S.extras,cyclesReady:S.cyclesReady,videos:Object.values(S.videos),videosReady:S.videosReady,active:null,email:S.email,ts:Date.now()})},400);
+  cacheT=setTimeout(()=>{if(!S.uid||!S.profile||S.offlineData)return;api.cacheSave(S.uid,{profile:S.profile,stdEx:S.stdEx,exercises:S.exercises,workouts:S.workouts,sessions:S.sessions,cycles:S.cycles,extras:S.extras,cyclesReady:S.cyclesReady,videos:Object.values(S.videos),defVideos:Object.values(S.defVideos),videosReady:S.videosReady,active:null,email:S.email,ts:Date.now()})},400);
 }
 
 /* ============ autenticação ============ */
@@ -166,12 +166,12 @@ function authErr(e){
 }
 function resetState(){
   clearTimeout(SY.timer);clearTimeout(SY.retry);clearTimeout(S.restT);
-  Object.assign(S,{uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,videos:{},videosReady:true,closing:{},session:null,rest:null,draft:null,sel:null,ui:{},view:'home',tab:'home',offlineData:false,rendered:false,loading:false,errMsg:''});
+  Object.assign(S,{uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,videos:{},defVideos:{},videosReady:true,closing:{},session:null,rest:null,draft:null,sel:null,ui:{},view:'home',tab:'home',offlineData:false,rendered:false,loading:false,errMsg:''});
 }
 function toSignedOut(info){
   resetState();S.boot='auth';S.auth={mode:'login',f:{},err:'',info:info||'',busy:false};render();
 }
-function applyData(d){S.profile=d.profile;S.stdEx=d.stdEx;S.exercises=d.exercises;S.workouts=d.workouts;S.sessions=d.sessions;S.cycles=d.cycles||[];S.extras=d.extras||[];S.cyclesReady=d.cyclesReady!==false;S.videos={};(d.videos||[]).forEach(v=>{S.videos[v.exerciseId]=v});S.videosReady=d.videosReady!==false}
+function applyData(d){S.profile=d.profile;S.stdEx=d.stdEx;S.exercises=d.exercises;S.workouts=d.workouts;S.sessions=d.sessions;S.cycles=d.cycles||[];S.extras=d.extras||[];S.cyclesReady=d.cyclesReady!==false;S.videos={};(d.videos||[]).forEach(v=>{S.videos[v.exerciseId]=v});S.defVideos={};(d.defVideos||[]).forEach(v=>{S.defVideos[v.exerciseId]=v});S.videosReady=d.videosReady!==false}
 function bootWith(d){
   applyData(d);S.session=null;S.lastLoad=Date.now();
   const loc=localRead(),remote=d.active,already=loc&&loc.s&&d.sessions.some(x=>x.id===loc.s.id);

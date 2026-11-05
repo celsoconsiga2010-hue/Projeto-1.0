@@ -51,7 +51,7 @@ const EQUIP=['Barra','Halteres','Máquinas','Polias','Peso corporal','Elásticos
 const GOALS=['Hipertrofia','Força','Emagrecimento','Condicionamento','Saúde geral'];
 
 /* ============ estado ============ */
-const S={boot:'loading',uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,videos:{},videosReady:true,closing:{},
+const S={boot:'loading',uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,videos:{},defVideos:{},videosReady:true,closing:{},
  tab:'home',view:'home',seg:{workouts:'treinos',history:'sessoes'},session:null,rest:null,sync:'saved',draft:null,sel:null,
  ui:{},discarded:{},auth:{mode:'login',f:{},err:'',info:'',busy:false},online:navigator.onLine!==false,offlineData:false,installEvt:null,rendered:false,top:false,errMsg:''};
 const LOCK=['session','wform','eform','profile','cform','gform'];

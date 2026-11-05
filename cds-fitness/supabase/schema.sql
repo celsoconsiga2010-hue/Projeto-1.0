@@ -665,3 +665,81 @@ values
   ('burpee', 'Burpee', 'Corpo inteiro', '{}'::text[], 'Peso corporal'),
   ('kettlebell-swing', 'Kettlebell swing', 'Corpo inteiro', array['Glúteos']::text[], 'Outros')
 on conflict (slug) where user_id is null do nothing;
+
+-- ---------------------------------------------------------------------
+-- 6b. VÍDEOS PADRÃO DO CATÁLOGO (acréscimo; não altera nenhum dado existente)
+--     Cada exercício padrão já vem com um vídeo de demonstração. São vídeos
+--     públicos de terceiros no YouTube, tocados dentro do app pelo player
+--     oficial. Quem quiser pode trocar pelo seu próprio vídeo (tabela
+--     exercise_videos, que tem prioridade sobre esta).
+-- ---------------------------------------------------------------------
+create table if not exists public.exercise_default_videos (
+  exercise_id uuid primary key references public.exercises(id) on delete cascade,
+  url         text not null,
+  title       text,
+  created_at  timestamptz not null default now(),
+  constraint edv_url   check (char_length(url) <= 2000 and url ~* '^https://'),
+  constraint edv_title check (title is null or char_length(title) <= 300)
+);
+
+alter table public.exercise_default_videos enable row level security;
+drop policy if exists exercise_default_videos_read on public.exercise_default_videos;
+create policy exercise_default_videos_read on public.exercise_default_videos for select to authenticated using (true);
+
+-- só leitura para o app; quem administra o banco (SQL Editor) altera os vídeos
+revoke all on public.exercise_default_videos from anon, public;
+revoke insert, update, delete on public.exercise_default_videos from authenticated;
+grant select on public.exercise_default_videos to authenticated;
+
+insert into public.exercise_default_videos (exercise_id, url, title)
+select e.id, v.url, v.title
+from (values
+  ('supino-reto-com-barra', 'https://www.youtube.com/watch?v=ZN7SuDQpNMk', 'Supino reto com barra - Execução Correta'),
+  ('supino-reto-com-halteres', 'https://www.youtube.com/watch?v=fbupGf-T4KM', 'Supino com halteres - exemplo de execução correta'),
+  ('supino-inclinado-com-halteres', 'https://www.youtube.com/watch?v=G-i3jMIbDmo', 'Supino inclinado com halteres: Execução correta e músculos solicitados'),
+  ('crucifixo-na-maquina-peck-deck', 'https://www.youtube.com/watch?v=zEcIgGm7fxU', 'Como executar Crucifixo Máquina / Voador / Peck-Deck'),
+  ('crossover-na-polia', 'https://www.youtube.com/watch?v=E3aha5zhlc0', 'CROSSOVER POLIA ALTA - O JEITO CERTO DE FAZER'),
+  ('flexao-de-braco', 'https://www.youtube.com/watch?v=RRi0-tvte6A', 'Como Fazer Flexão de Braço Corretamente?'),
+  ('barra-fixa', 'https://www.youtube.com/watch?v=EbdDzpawkt4', 'Como fazer barra fixa certo'),
+  ('remada-curvada-com-barra', 'https://www.youtube.com/watch?v=s4jeKLRghTM', 'REMADA CURVADA COM BARRA - APRENDA COMO FAZER CORRETAMENTE'),
+  ('puxada-frontal-na-polia', 'https://www.youtube.com/watch?v=7cCiQUdIXWw', 'COMO FAZER PUXADA ALTA OU FRENTE (pulley frente)'),
+  ('remada-baixa-na-polia', 'https://www.youtube.com/watch?v=UkjIu0qcaio', 'COMO FAZER A REMADA BAIXA'),
+  ('remada-unilateral-com-halter', 'https://www.youtube.com/watch?v=EUisRaNkCd4', 'Remada Unilateral com Haltere (Serrote)'),
+  ('levantamento-terra', 'https://www.youtube.com/watch?v=6E-rUBDENzA', 'Levantamento Terra - Como Fazer Corretamente'),
+  ('remada-com-elastico', 'https://www.youtube.com/watch?v=kjc7U5eMaB0', 'remada com elástico em pé - como fazer certo'),
+  ('desenvolvimento-com-halteres', 'https://www.youtube.com/watch?v=eufDL9MmF8A', 'Como fazer o Desenvolvimento com Halteres'),
+  ('desenvolvimento-com-barra', 'https://www.youtube.com/watch?v=o2LfBH1I8r8', 'Desenvolvimento de Ombros com Barra'),
+  ('elevacao-lateral-com-halteres', 'https://www.youtube.com/watch?v=gURBTU9VSJg', 'Como fazer a elevação lateral com halteres'),
+  ('elevacao-frontal-com-halteres', 'https://www.youtube.com/watch?v=jhxLYSm_P-k', 'Elevação Frontal com Halteres (Ombros)'),
+  ('crucifixo-inverso-na-maquina', 'https://www.youtube.com/watch?v=EWwR2Z-yHjQ', 'Como fazer crucifixo inverso na máquina'),
+  ('rosca-direta-com-barra', 'https://www.youtube.com/watch?v=Et1wgGMGW8w', 'ROSCA DIRETA COM BARRA - COMO FAZER CORRETAMENTE'),
+  ('rosca-alternada-com-halteres', 'https://www.youtube.com/watch?v=865ar4KPodA', 'COMO FAZER ROSCA ALTERNADA COM HALTERES CORRETAMENTE'),
+  ('rosca-martelo', 'https://www.youtube.com/watch?v=sBsoX4Sn4iw', 'Rosca Martelo - Execução Exercício'),
+  ('rosca-na-polia', 'https://www.youtube.com/watch?v=iIrEPE28Gxw', 'Rosca Direta na Polia - Como fazer'),
+  ('triceps-testa-com-barra', 'https://www.youtube.com/watch?v=aHUB1thRUiY', 'Tríceps Testa com Barra Reta'),
+  ('triceps-na-polia-corda', 'https://www.youtube.com/watch?v=7le1JRUUagM', 'Tríceps na polia alta com corda: Execução e postura correta'),
+  ('triceps-frances-com-halter', 'https://www.youtube.com/watch?v=ZFCydwcePfU', 'Tríceps francês com halter'),
+  ('mergulho-entre-bancos', 'https://www.youtube.com/watch?v=qAKB1H2kz2g', 'Tríceps banco ou Tríceps Mergulho - Como fazer!'),
+  ('rosca-de-punho', 'https://www.youtube.com/watch?v=1ZmXT_fpLOI', 'APRENDA a fazer ROSCA PUNHO corretamente'),
+  ('abdominal-na-maquina', 'https://www.youtube.com/watch?v=pR7WtwTOOTw', 'Abdominal na máquina (flexão de tronco): como fazer'),
+  ('abdominal-supra-no-solo', 'https://www.youtube.com/watch?v=tGobCIvFPHI', 'Abdominal Supra - Como fazer certo!'),
+  ('prancha', 'https://www.youtube.com/watch?v=thZZtS9gapk', 'COMO FAZER PRANCHA ABDOMINAL'),
+  ('elevacao-de-pernas', 'https://www.youtube.com/watch?v=cCGSbAjIP3k', 'Abdominal Elevação de Pernas - Como Fazer'),
+  ('agachamento-livre', 'https://www.youtube.com/watch?v=rM6SDUdl9fs', 'Agachamento livre com barra - Como fazer corretamente'),
+  ('leg-press-45', 'https://www.youtube.com/watch?v=waAxlYvtCcI', 'Exercício Leg Press 45° - Execução Correta'),
+  ('cadeira-extensora', 'https://www.youtube.com/watch?v=mruTNzILY3U', 'Como fazer CADEIRA EXTENSORA CORRETAMENTE: erros e ajustes!'),
+  ('agachamento-bulgaro', 'https://www.youtube.com/watch?v=gmDBJYTgRUA', 'Como fazer o agachamento búlgaro da forma correta'),
+  ('afundo-com-halteres', 'https://www.youtube.com/watch?v=mKRq_p3hQr4', 'Afundo com halter (agachamento unilateral): como fazer'),
+  ('mesa-flexora', 'https://www.youtube.com/watch?v=8Nat6GRiEoc', 'Mesa Flexora - Como fazer corretamente e otimizar os resultados!'),
+  ('stiff-com-barra', 'https://www.youtube.com/watch?v=iN3O5U_Ujxc', 'COMO FAZER STIFF COM BARRA CORRETAMENTE'),
+  ('cadeira-flexora', 'https://www.youtube.com/watch?v=CHsaztLSSrc', 'Como Fazer CADEIRA FLEXORA | Passo a Passo na Academia'),
+  ('elevacao-pelvica', 'https://www.youtube.com/watch?v=np35bxrQqRI', 'Elevação Pélvica: Como fazer e ter mais glúteos e posterior de coxas!'),
+  ('gluteo-na-polia-coice', 'https://www.youtube.com/watch?v=S2_Rsx-Ud2w', 'GLÚTEO coice na polia - Como fazer do jeito CERTO'),
+  ('cadeira-abdutora', 'https://www.youtube.com/watch?v=50qHGus1TZk', 'Cadeira Abdutora: Como fazer e Postura correta'),
+  ('panturrilha-em-pe-na-maquina', 'https://www.youtube.com/watch?v=qWHH0We_9r0', 'Panturrilha em pé na máquina'),
+  ('panturrilha-sentado', 'https://www.youtube.com/watch?v=7hbYg4-NZ74', 'EXERCÍCIO PANTURRILHA SENTADO - como executar corretamente'),
+  ('burpee', 'https://www.youtube.com/watch?v=CrGAnJEfcmY', 'Como Fazer Burpee da forma correta e queimar mais calorias'),
+  ('kettlebell-swing', 'https://www.youtube.com/watch?v=ynpU22NqrsA', 'Swing com Kettlebell - Você sabe como fazer corretamente?')
+) as v(slug, url, title)
+join public.exercises e on e.slug = v.slug and e.user_id is null
+on conflict (exercise_id) do update set url = excluded.url, title = excluded.title;
