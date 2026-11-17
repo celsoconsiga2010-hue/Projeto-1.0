@@ -55,6 +55,17 @@ Não tem etapa de build. São arquivos estáticos.
 
 Detalhes técnicos: o `index.html` agora permite `frame-src` para `youtube-nocookie.com` e `player.vimeo.com` e `media-src https:`. O cache do app passa para `cds-fitness-v3`. Se hospedar com cabeçalho `Referrer-Policy: no-referrer`, o app já envia a referência necessária só para o player do YouTube.
 
+## Novidades (versão 4): compartilhar treinos
+
+- Em **Treinos › Meus treinos**, toque em **Compartilhar** no treino, busque a pessoa pelo **nome de usuário, e-mail ou ID** (precisa ser exato e a conta precisa existir) e envie o convite.
+- Quem recebe vê um aviso no app (selo vermelho em *Treinos*, cartão na tela inicial e aba **Recebidos**) com remetente, treino, data, exercícios e os botões **Aceitar** e **Recusar**.
+- Ao aceitar, o treino vira uma **cópia só da pessoa**, chamada, por exemplo, *Hipertrofia A - compartilhado*, com exercícios, ordem, séries, repetições, carga, descanso, observações e vídeos em link. Depois disso, nada que um lado edite muda o outro. Vídeos enviados como arquivo não são copiados (o app avisa).
+- Estados do convite: Pendente, Aceito, Recusado e Cancelado (o remetente pode cancelar enquanto estiver pendente). A aba **Recebidos** guarda o histórico do que você recebeu e do que enviou.
+- O mesmo treino não pode ser enviado duas vezes para a mesma pessoa enquanto houver convite pendente, e aceitar o mesmo convite duas vezes não duplica o treino.
+- Segurança: toda a regra está no banco (funções `share_workout`, `respond_share`, `cancel_share`, seção 5d do `schema.sql`). O destinatário só vê um resumo (nome, exercícios, séries) antes de aceitar; nunca lê as tabelas do remetente.
+
+**Para atualizar um banco já em uso:** rode de novo o `supabase/schema.sql` inteiro (ou só o arquivo `atualizacao-compartilhamento.sql`) no SQL Editor. Sem esse passo o app funciona normalmente, só esconde o botão Compartilhar. O cache do app passa para `cds-fitness-v4`.
+
 ## Passo 1. Criar o projeto no Supabase
 
 1. Entre em [supabase.com](https://supabase.com), crie uma conta e um **New project**. Guarde a senha do banco.

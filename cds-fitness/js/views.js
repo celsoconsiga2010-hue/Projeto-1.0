@@ -82,7 +82,7 @@ function vHome(){
   const vols=fin.slice(0,10).reverse().map(s=>({label:fmtShort(s.date),v:sesVolume(s),tip:fmtDate(s.date)+' · '+s.workoutName+': '+fmt(sesVolume(s),0)+' '+unit()}));
   const rank=evolutionRank().slice(0,3),prs=personalRecords().slice(0,5);
   return '<div class="stack"><div><div class="eyebrow">'+esc(dateTxt)+'</div><h1>'+greet+', '+esc(first)+'</h1></div>'+
-   '<section class="hero" aria-label="Treino de hoje">'+hero+'</section>'+homeCycle()+
+   '<section class="hero" aria-label="Treino de hoje">'+hero+'</section>'+homeShares()+homeCycle()+
    '<div class="stats"><div class="stat"><span class="eyebrow">Treinos na semana</span><span class="v">'+week.length+'<small>/ '+goal+'</small></span><span class="s">'+(week.length>=goal?'Meta da semana atingida':'Faltam '+(goal-week.length)+' para a meta')+'</span></div>'+
    '<div class="stat"><span class="eyebrow">Último treino</span><span class="v" style="font-size:26px;line-height:1.1">'+(last?esc(last.workoutName):'–')+'</span><span class="s">'+(last?fmtDate(last.date)+' · '+ago(last.date):'Nenhum treino concluído ainda')+'</span></div>'+
    '<div class="stat"><span class="eyebrow">Exercícios cadastrados</span><span class="v">'+allEx().length+'</span><span class="s">'+S.exercises.filter(e=>!e.archived).length+' criados por você</span></div></div>'+
@@ -99,9 +99,10 @@ function vWorkouts(){
   let body;
   if(cur==='exercicios')body=vCatalog();
   else if(cur==='semana')body=vWeek();
+  else if(cur==='recebidos')body=vShares();
   else body=vWorkoutList();
   return '<div class="stack"><div class="pagehead"><h1>Treinos</h1>'+(cur==='treinos'?'<div class="row"><button class="btn" data-act="genOpen">Gerar treino</button><button class="btn primary" data-act="newWorkout">'+ic('plus','sm')+' Novo treino</button></div>':cur==='exercicios'?'<button class="btn primary" data-act="newExercise">'+ic('plus','sm')+' Novo exercício</button>':'')+'</div>'+
-    seg([['treinos','Meus treinos'],['semana','Semana'],['exercicios','Exercícios']],cur,'segW')+body+'</div>';
+    seg([['treinos','Meus treinos'],['semana','Semana'],['exercicios','Exercícios'],['recebidos','Recebidos'+shBadge(pendingCount())]],cur,'segW')+body+'</div>';
 }
 function vWorkoutList(){
   if(!S.workouts.length)return emptyStart();
@@ -114,7 +115,7 @@ function vWorkoutList(){
      (w.description?'<p class="muted small">'+esc(w.description)+'</p>':'')+
      '<div class="list">'+(w.exercises||[]).map(e=>'<div class="li" style="padding:8px 2px"><span class="grow"><span class="t" style="font-weight:500">'+esc(e.name)+'</span></span><span class="muted small tn">'+e.sets+' × '+e.repMin+'–'+e.repMax+(e.load!==''&&e.load!=null?' · '+esc(e.load)+' '+unit():'')+'</span></div>').join('')+'</div>'+
      (del?'<div class="confirm"><b>Excluir "'+esc(w.name)+'"?</b><span class="small">As sessões já realizadas continuam no histórico. Só o plano do treino é removido.</span><div class="row"><button class="btn danger fill" data-act="delWorkout" data-id="'+esc(w.id)+'">Excluir treino</button><button class="btn" data-act="cancelDel">Cancelar</button></div></div>':
-     '<div class="row"><button class="btn primary sm" data-act="startW" data-id="'+esc(w.id)+'">'+ic('play','sm')+' Iniciar</button><button class="btn sm" data-act="editWorkout" data-id="'+esc(w.id)+'">'+ic('edit','sm')+' Editar</button><button class="btn sm" data-act="dupWorkout" data-id="'+esc(w.id)+'">'+ic('copy','sm')+' Duplicar</button><button class="btn sm ghost danger" data-act="askDelW" data-id="'+esc(w.id)+'">'+ic('trash','sm')+' Excluir</button></div>')+
+     '<div class="row"><button class="btn primary sm" data-act="startW" data-id="'+esc(w.id)+'">'+ic('play','sm')+' Iniciar</button><button class="btn sm" data-act="editWorkout" data-id="'+esc(w.id)+'">'+ic('edit','sm')+' Editar</button><button class="btn sm" data-act="dupWorkout" data-id="'+esc(w.id)+'">'+ic('copy','sm')+' Duplicar</button>'+(S.sharesReady?'<button class="btn sm" data-act="shareOpen" data-id="'+esc(w.id)+'">'+ic('share','sm')+' Compartilhar</button>':'')+'<button class="btn sm ghost danger" data-act="askDelW" data-id="'+esc(w.id)+'">'+ic('trash','sm')+' Excluir</button></div>')+
      '</article>';
   }).join('');
 }

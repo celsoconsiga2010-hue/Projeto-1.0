@@ -614,6 +614,293 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- 5d. COMPARTILHAMENTO DE TREINOS ENTRE USUÁRIOS (acréscimo; não altera nenhuma
+--     tabela existente nem dados já cadastrados)
+--
+--   Fluxo: A compartilha -> convite "pendente" -> B aceita ou recusa.
+--   Ao aceitar, B ganha uma CÓPIA independente do treino (sem ligação com o
+--   original). Todo o fluxo passa por funções (security definer): o app não
+--   escreve direto na tabela, então ninguém consegue forjar convite, aceitar
+--   no lugar de outra pessoa nem ler treinos privados de terceiros.
+-- ---------------------------------------------------------------------
+create table if not exists public.workout_shares (
+  id             uuid primary key default gen_random_uuid(),
+  from_user      uuid not null references public.profiles(id) on delete cascade,
+  to_user        uuid not null references public.profiles(id) on delete cascade,
+  workout_id     uuid references public.workouts(id) on delete set null,   -- original (só para o histórico)
+  workout_name   text not null,
+  from_name      text not null,
+  to_name        text not null,
+  exercise_count int  not null,
+  summary        jsonb not null default '{}'::jsonb,   -- o que o destinatário vê ANTES de aceitar
+  snapshot       jsonb not null,                       -- cópia completa; só a função de aceite lê
+  status         text not null default 'pendente',
+  seen_at        timestamptz,
+  created_at     timestamptz not null default now(),
+  responded_at   timestamptz,
+  new_workout_id uuid references public.workouts(id) on delete set null,   -- cópia criada no aceite
+  constraint ws_status   check (status in ('pendente', 'aceito', 'recusado', 'cancelado')),
+  constraint ws_not_self check (from_user <> to_user),
+  constraint ws_resp     check ((status = 'pendente') = (responded_at is null))
+);
+-- no máximo um convite pendente por treino e destinatário
+create unique index if not exists ws_one_pending on public.workout_shares (from_user, to_user, workout_id)
+  where status = 'pendente' and workout_id is not null;
+create index if not exists ws_to_idx   on public.workout_shares (to_user, status, created_at desc);
+create index if not exists ws_from_idx on public.workout_shares (from_user, created_at desc);
+
+alter table public.workout_shares enable row level security;
+drop policy if exists workout_shares_parties_read on public.workout_shares;
+create policy workout_shares_parties_read on public.workout_shares for select to authenticated
+  using (from_user = (select auth.uid()) or to_user = (select auth.uid()));
+
+-- Só leitura, e SEM a coluna "snapshot" (a cópia completa só é lida na hora do aceite).
+revoke all on public.workout_shares from anon, public, authenticated;
+grant select (id, from_user, to_user, workout_id, workout_name, from_name, to_name, exercise_count,
+              summary, status, seen_at, created_at, responded_at, new_workout_id)
+  on public.workout_shares to authenticated;
+
+-- Busca o destinatário. Só encontra correspondência EXATA de nome de usuário,
+-- e-mail ou ID (não dá para listar usuários) e devolve só nome e usuário.
+create or replace function public.find_share_target(p_query text)
+returns table (id uuid, username text, full_name text)
+language plpgsql stable security definer set search_path = public, auth as $$
+declare
+  v_uid uuid := auth.uid();
+  v_q   text := lower(btrim(coalesce(p_query, '')));
+begin
+  if v_uid is null then
+    raise exception 'Não autenticado' using errcode = '28000';
+  end if;
+  v_q := regexp_replace(v_q, '^@', '');
+  if char_length(v_q) < 3 then
+    raise exception 'Digite pelo menos 3 caracteres.';
+  end if;
+  if v_q ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    return query select p.id, p.username, p.full_name from public.profiles p
+      where p.id = v_q::uuid and p.id <> v_uid;
+  elsif position('@' in v_q) > 1 then
+    return query select p.id, p.username, p.full_name from public.profiles p
+      join auth.users u on u.id = p.id
+      where lower(u.email) = v_q and p.id <> v_uid limit 1;
+  else
+    return query select p.id, p.username, p.full_name from public.profiles p
+      where p.username = v_q and p.id <> v_uid;
+  end if;
+end $$;
+
+-- Cria o convite (status pendente) com uma cópia congelada do treino.
+create or replace function public.share_workout(p_workout uuid, p_to uuid)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  v_uid  uuid := auth.uid();
+  w      public.workouts;
+  v_from public.profiles;
+  v_to   public.profiles;
+  v_ex   jsonb;
+  v_sum  jsonb;
+  v_cnt  int;
+  v_id   uuid;
+begin
+  if v_uid is null then
+    raise exception 'Não autenticado' using errcode = '28000';
+  end if;
+  select * into w from public.workouts where id = p_workout and user_id = v_uid;
+  if not found then
+    raise exception 'Treino não encontrado na sua conta.';
+  end if;
+  select * into v_to from public.profiles where id = p_to;
+  if not found then
+    raise exception 'Usuário não encontrado.';
+  end if;
+  if p_to = v_uid then
+    raise exception 'Você não pode compartilhar um treino com você mesmo.';
+  end if;
+  select * into v_from from public.profiles where id = v_uid;
+
+  if exists (select 1 from public.workout_shares
+             where from_user = v_uid and to_user = p_to and workout_id = p_workout and status = 'pendente') then
+    raise exception 'Este treino já foi enviado para % e está aguardando resposta.', v_to.full_name;
+  end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'std', e.user_id is null, 'exercise_id', e.id, 'name', e.name, 'muscle_group', e.muscle_group,
+           'secondary_groups', to_jsonb(e.secondary_groups), 'equipment', e.equipment,
+           'description', e.description, 'ex_notes', e.notes,
+           'sets', we.sets, 'rep_min', we.rep_min, 'rep_max', we.rep_max, 'load', we.load,
+           'rest_seconds', we.rest_seconds, 'progression_inc', we.progression_inc, 'notes', we.notes,
+           'video_url', v.url, 'video_file', coalesce(v.kind = 'arquivo', false)
+         ) order by we.position), '[]'::jsonb)
+    into v_ex
+  from public.workout_exercises we
+  join public.exercises e on e.id = we.exercise_id
+  left join public.exercise_videos v on v.user_id = v_uid and v.exercise_id = e.id
+  where we.workout_id = p_workout and we.user_id = v_uid;
+
+  v_cnt := jsonb_array_length(v_ex);
+  if v_cnt = 0 then
+    raise exception 'Este treino não tem exercícios para compartilhar.';
+  end if;
+
+  v_sum := jsonb_build_object(
+    'description', w.description, 'goal', w.goal, 'muscles', to_jsonb(w.muscles),
+    'exercises', (select coalesce(jsonb_agg(jsonb_build_object(
+                    'name', t.x ->> 'name', 'group', t.x ->> 'muscle_group',
+                    'sets', (t.x ->> 'sets')::int, 'rep_min', (t.x ->> 'rep_min')::int, 'rep_max', (t.x ->> 'rep_max')::int
+                  ) order by t.i), '[]'::jsonb)
+                  from jsonb_array_elements(v_ex) with ordinality as t(x, i)));
+
+  begin
+    insert into public.workout_shares
+      (from_user, to_user, workout_id, workout_name, from_name, to_name, exercise_count, summary, snapshot)
+    values
+      (v_uid, p_to, p_workout, w.name, v_from.full_name, v_to.full_name, v_cnt, v_sum,
+       jsonb_build_object('name', w.name, 'description', w.description, 'goal', w.goal,
+                          'muscles', to_jsonb(w.muscles), 'notes', w.notes, 'exercises', v_ex))
+    returning id into v_id;
+  exception when unique_violation then
+    raise exception 'Este treino já foi enviado para % e está aguardando resposta.', v_to.full_name;
+  end;
+  return v_id;
+end $$;
+
+-- Aceitar ou recusar. Só o destinatário, só enquanto pendente, e uma única vez
+-- (a linha do convite fica travada, então dois toques seguidos não duplicam o treino).
+create or replace function public.respond_share(p_share uuid, p_accept boolean)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  s     public.workout_shares;
+  v_wid uuid;
+  v_ex  jsonb;
+  v_eid uuid;
+  v_pos bigint;
+  v_n   int;
+  v_vc  int := 0;
+  v_vs  int := 0;
+begin
+  if v_uid is null then
+    raise exception 'Não autenticado' using errcode = '28000';
+  end if;
+  select * into s from public.workout_shares where id = p_share and to_user = v_uid for update;
+  if not found then
+    raise exception 'Convite não encontrado.';
+  end if;
+
+  if s.status <> 'pendente' then
+    if s.status = 'aceito' and p_accept then
+      return jsonb_build_object('status', 'aceito', 'already', true, 'workout_id', s.new_workout_id,
+                                'videos_copied', 0, 'videos_skipped', 0);
+    end if;
+    if s.status = 'cancelado' then
+      raise exception 'O remetente cancelou este convite.';
+    end if;
+    raise exception 'Este convite já foi respondido.';
+  end if;
+
+  if not p_accept then
+    update public.workout_shares set status = 'recusado', responded_at = now(), seen_at = coalesce(seen_at, now())
+      where id = s.id;
+    return jsonb_build_object('status', 'recusado', 'already', false);
+  end if;
+
+  -- cópia independente, na conta de quem aceitou
+  v_wid := gen_random_uuid();
+  insert into public.workouts (id, user_id, name, description, goal, muscles, notes)
+  values (v_wid, v_uid,
+          left(btrim(s.snapshot ->> 'name'), 64) || ' - compartilhado',
+          coalesce(s.snapshot ->> 'description', ''), coalesce(s.snapshot ->> 'goal', ''),
+          array(select jsonb_array_elements_text(coalesce(s.snapshot -> 'muscles', '[]'::jsonb))),
+          coalesce(s.snapshot ->> 'notes', ''));
+
+  for v_ex, v_pos in
+    select t.x, t.i from jsonb_array_elements(s.snapshot -> 'exercises') with ordinality as t(x, i) order by t.i
+  loop
+    v_eid := null;
+    -- exercício padrão: usa o mesmo do catálogo
+    if coalesce((v_ex ->> 'std')::boolean, false) then
+      select id into v_eid from public.exercises where id = (v_ex ->> 'exercise_id')::uuid and user_id is null;
+    end if;
+    -- exercício personalizado: reaproveita um de mesmo nome de quem aceitou ou cria uma cópia
+    if v_eid is null then
+      select id into v_eid from public.exercises
+        where user_id = v_uid and archived_at is null and lower(name) = lower(v_ex ->> 'name') limit 1;
+      if v_eid is null then
+        insert into public.exercises (user_id, name, muscle_group, secondary_groups, equipment, description, notes)
+        values (v_uid, left(btrim(v_ex ->> 'name'), 120), v_ex ->> 'muscle_group',
+                array(select jsonb_array_elements_text(coalesce(v_ex -> 'secondary_groups', '[]'::jsonb))),
+                v_ex ->> 'equipment', coalesce(v_ex ->> 'description', ''), coalesce(v_ex ->> 'ex_notes', ''))
+        returning id into v_eid;
+      end if;
+    end if;
+
+    insert into public.workout_exercises
+      (user_id, workout_id, exercise_id, position, sets, rep_min, rep_max, load, rest_seconds, progression_inc, notes)
+    values
+      (v_uid, v_wid, v_eid, v_pos::int,
+       coalesce((v_ex ->> 'sets')::int, 3), coalesce((v_ex ->> 'rep_min')::int, 8), coalesce((v_ex ->> 'rep_max')::int, 12),
+       nullif(v_ex ->> 'load', '')::numeric, coalesce((v_ex ->> 'rest_seconds')::int, 90),
+       coalesce((v_ex ->> 'progression_inc')::numeric, 2.5), coalesce(v_ex ->> 'notes', ''));
+
+    -- vídeo: link é copiado (se quem aceitou ainda não tem vídeo próprio nesse exercício);
+    -- arquivo enviado pelo remetente fica no espaço privado dele e não é copiado
+    if nullif(v_ex ->> 'video_url', '') is not null then
+      insert into public.exercise_videos (user_id, exercise_id, kind, url)
+      values (v_uid, v_eid, 'link', v_ex ->> 'video_url')
+      on conflict (user_id, exercise_id) do nothing;
+      get diagnostics v_n = row_count;
+      v_vc := v_vc + v_n;
+    elsif coalesce((v_ex ->> 'video_file')::boolean, false) then
+      v_vs := v_vs + 1;
+    end if;
+  end loop;
+
+  update public.workout_shares
+     set status = 'aceito', responded_at = now(), seen_at = coalesce(seen_at, now()), new_workout_id = v_wid
+   where id = s.id;
+  return jsonb_build_object('status', 'aceito', 'already', false, 'workout_id', v_wid,
+                            'videos_copied', v_vc, 'videos_skipped', v_vs);
+end $$;
+
+-- O remetente cancela um convite que ainda está pendente.
+create or replace function public.cancel_share(p_share uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  s     public.workout_shares;
+begin
+  if v_uid is null then
+    raise exception 'Não autenticado' using errcode = '28000';
+  end if;
+  select * into s from public.workout_shares where id = p_share and from_user = v_uid for update;
+  if not found then
+    raise exception 'Convite não encontrado.';
+  end if;
+  if s.status <> 'pendente' then
+    raise exception 'Este convite já foi respondido e não pode mais ser cancelado.';
+  end if;
+  update public.workout_shares set status = 'cancelado', responded_at = now() where id = s.id;
+end $$;
+
+-- Marca os convites recebidos como vistos (some o aviso de "novo").
+create or replace function public.mark_shares_seen()
+returns void language sql security definer set search_path = public as $$
+  update public.workout_shares set seen_at = now()
+  where to_user = auth.uid() and status = 'pendente' and seen_at is null
+$$;
+
+revoke all on function public.find_share_target(text)       from public, anon;
+revoke all on function public.share_workout(uuid, uuid)     from public, anon;
+revoke all on function public.respond_share(uuid, boolean)  from public, anon;
+revoke all on function public.cancel_share(uuid)            from public, anon;
+revoke all on function public.mark_shares_seen()            from public, anon;
+grant execute on function public.find_share_target(text)       to authenticated;
+grant execute on function public.share_workout(uuid, uuid)     to authenticated;
+grant execute on function public.respond_share(uuid, boolean)  to authenticated;
+grant execute on function public.cancel_share(uuid)            to authenticated;
+grant execute on function public.mark_shares_seen()            to authenticated;
+
+-- ---------------------------------------------------------------------
 -- 6. CATÁLOGO PADRÃO DE EXERCÍCIOS
 -- ---------------------------------------------------------------------
 insert into public.exercises (slug, name, muscle_group, secondary_groups, equipment)

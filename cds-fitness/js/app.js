@@ -166,12 +166,12 @@ function authErr(e){
 }
 function resetState(){
   clearTimeout(SY.timer);clearTimeout(SY.retry);clearTimeout(S.restT);
-  Object.assign(S,{uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,videos:{},defVideos:{},videosReady:true,closing:{},session:null,rest:null,draft:null,sel:null,ui:{},view:'home',tab:'home',offlineData:false,rendered:false,loading:false,errMsg:''});
+  Object.assign(S,{uid:null,email:'',profile:null,stdEx:[],exercises:[],workouts:[],sessions:[],cycles:[],extras:[],cyclesReady:true,videos:{},defVideos:{},videosReady:true,shares:{rec:[],sent:[]},sharesReady:true,closing:{},session:null,rest:null,draft:null,sel:null,ui:{},view:'home',tab:'home',offlineData:false,rendered:false,loading:false,errMsg:''});
 }
 function toSignedOut(info){
   resetState();S.boot='auth';S.auth={mode:'login',f:{},err:'',info:info||'',busy:false};render();
 }
-function applyData(d){S.profile=d.profile;S.stdEx=d.stdEx;S.exercises=d.exercises;S.workouts=d.workouts;S.sessions=d.sessions;S.cycles=d.cycles||[];S.extras=d.extras||[];S.cyclesReady=d.cyclesReady!==false;S.videos={};(d.videos||[]).forEach(v=>{S.videos[v.exerciseId]=v});S.defVideos={};(d.defVideos||[]).forEach(v=>{S.defVideos[v.exerciseId]=v});S.videosReady=d.videosReady!==false}
+function applyData(d){S.profile=d.profile;S.stdEx=d.stdEx;S.exercises=d.exercises;S.workouts=d.workouts;S.sessions=d.sessions;S.cycles=d.cycles||[];S.extras=d.extras||[];S.cyclesReady=d.cyclesReady!==false;S.videos={};(d.videos||[]).forEach(v=>{S.videos[v.exerciseId]=v});S.defVideos={};(d.defVideos||[]).forEach(v=>{S.defVideos[v.exerciseId]=v});S.sharesReady=d.sharesReady!==false;setShares(d.shares||[]);S.videosReady=d.videosReady!==false}
 function bootWith(d){
   applyData(d);S.session=null;S.lastLoad=Date.now();
   const loc=localRead(),remote=d.active,already=loc&&loc.s&&d.sessions.some(x=>x.id===loc.s.id);
@@ -182,7 +182,7 @@ function bootWith(d){
   applyTheme(S.profile.theme);
   S.boot='ready';S.view='home';S.tab='home';S.draft=null;S.top=true;S.loading=false;render();
   if(S.session&&dirty&&!S.offlineData)syncNow();
-  autoCheck();
+  autoCheck();sharesBoot();
 }
 async function loadApp(user){
   if(S.loading)return;S.loading=true;
@@ -396,7 +396,7 @@ const A={
   render();
  })}
 };
-Object.assign(A,A_CY,A_VID);
+Object.assign(A,A_CY,A_VID,A_SH);
 document.addEventListener('click',e=>{
   const pt=e.target.closest&&e.target.closest('.pt');if(pt){showTip(pt);return}
   const el=e.target.closest&&e.target.closest('[data-act]');if(!el||!$('#app').contains(el))return;
@@ -441,6 +441,7 @@ document.addEventListener('input',e=>{
   else if(sc==='pw')S.draft.pw[f]=v;
   else if(sc==='sugv')S.ui.sugVal=v;
   else if(sc==='vid'){if(S.ui.vSheet)S.ui.vSheet[f]=v}
+  else if(sc==='sh'){if(S.ui.shSheet){S.ui.shSheet[f]=v;S.ui.shSheet.err=''}}
   else if(sc==='cy'||sc==='xf')cyInput(sc,f,v);
   else if(sc==='ses'&&S.session){
     const ses=S.session;

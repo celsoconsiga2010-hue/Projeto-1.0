@@ -252,3 +252,9 @@ code.k{font:500 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;backgr
   .exc .vslot.none{flex-direction:column;align-items:flex-start}
 }
 @media print{.vslot,.vsheet{display:none}}
+
+/* compartilhamento de treinos */
+.ico{position:relative;display:inline-flex}
+.bdg{position:absolute;top:-6px;right:-10px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--bad);color:#fff;font:700 11px/18px var(--body);font-style:normal;text-align:center}
+.seg .bdg,.seg button .bdg{position:static;display:inline-block;margin-left:6px;vertical-align:middle}
+.li .btn.sm{margin-left:8px}

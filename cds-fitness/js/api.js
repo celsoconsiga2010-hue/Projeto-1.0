@@ -46,6 +46,8 @@ const mapCycle=r=>({id:r.id,name:r.name,workoutIds:Array.isArray(r.workout_ids)?
   workouts:Array.isArray(r.workouts_snapshot)?r.workouts_snapshot:[],handled:!!r.handled,renewOf:r.renew_of||null,createdAt:r.created_at});
 const mapVideo=r=>({id:r.id,exerciseId:r.exercise_id,kind:r.kind,url:r.url||'',path:r.storage_path||'',fileName:r.file_name||''});
 const mapDefVideo=r=>({exerciseId:r.exercise_id,kind:'link',url:r.url,title:r.title||'',def:true});
+const SHARE_COLS='id,from_user,to_user,workout_id,workout_name,from_name,to_name,exercise_count,summary,status,seen_at,created_at,responded_at,new_workout_id';
+const mapShare=r=>({id:r.id,from:r.from_user,to:r.to_user,workoutId:r.workout_id,name:r.workout_name,fromName:r.from_name,toName:r.to_name,count:r.exercise_count,summary:r.summary||{},status:r.status,seen:!!r.seen_at,at:r.created_at,respondedAt:r.responded_at,newWorkoutId:r.new_workout_id});
 const mapExtra=r=>({id:r.id,type:r.activity_type,date:r.activity_date,durationMin:r.duration_min,notes:r.notes||'',createdAt:r.created_at});
 function cycleRow(c){
   const m={name:'name',workoutIds:'workout_ids',rounds:'rounds',totalSessions:'total_sessions',startDate:'start_date',deadline:'deadline',daysPerWeek:'days_per_week',autoClose:'auto_close',
@@ -81,17 +83,27 @@ const api={
     let videos=[],videosReady=true;
     try{videos=await api.loadVideos()}
     catch(e){if(isNetErr(e))throw e;videosReady=false}
+    /* compartilhamento de treinos: tabela nova opcional */
+    let shares=[],sharesReady=true;
+    try{shares=await api.loadShares()}
+    catch(e){if(isNetErr(e))throw e;sharesReady=false}
     let defVideos=[];
     try{defVideos=await api.loadDefaultVideos()}
     catch(e){if(isNetErr(e))throw e}
     return {profile:mapProfile(prof),stdEx:all.filter(e=>e.std),exercises:all.filter(e=>!e.std),
-      workouts:mapWorkouts(ws,wes,look),sessions:mapSessions(ss,ses,sets),cycles:cycles,extras:extras,cyclesReady:cyclesReady,videos:videos,videosReady:videosReady,defVideos:defVideos,
+      workouts:mapWorkouts(ws,wes,look),sessions:mapSessions(ss,ses,sets),cycles:cycles,extras:extras,cyclesReady:cyclesReady,videos:videos,videosReady:videosReady,defVideos:defVideos,shares:shares,sharesReady:sharesReady,
       active:act?Object.assign({},act.draft,{id:act.id}):null,ts:Date.now()};
   },
   async loadCycles(){return (await fetchAll((a,b)=>sb.from('training_cycles').select('*').order('created_at').order('id').range(a,b))).map(mapCycle)},
   async loadExtras(){return (await fetchAll((a,b)=>sb.from('extra_activities').select('*').order('activity_date',{ascending:false}).order('id').range(a,b))).map(mapExtra)},
   async loadVideos(){return (await fetchAll((a,b)=>sb.from('exercise_videos').select('*').order('id').range(a,b))).map(mapVideo)},
   async loadDefaultVideos(){return (await fetchAll((a,b)=>sb.from('exercise_default_videos').select('*').order('exercise_id').range(a,b))).map(mapDefVideo)},
+  async loadShares(){return (await fetchAll((a,b)=>sb.from('workout_shares').select(SHARE_COLS).order('created_at',{ascending:false}).order('id').range(a,b))).map(mapShare)},
+  async findShareTarget(q){return must(await sb.rpc('find_share_target',{p_query:q}))||[]},
+  async shareWorkout(wid,to){return must(await sb.rpc('share_workout',{p_workout:wid,p_to:to}))},
+  async respondShare(id,accept){return must(await sb.rpc('respond_share',{p_share:id,p_accept:accept}))},
+  async cancelShare(id){must(await sb.rpc('cancel_share',{p_share:id}))},
+  async markSharesSeen(){try{await sb.rpc('mark_shares_seen')}catch(e){}},
   async saveVideo(exId,row){must(await sb.from('exercise_videos').upsert(Object.assign({user_id:S.uid,exercise_id:exId},row),{onConflict:'user_id,exercise_id'}))},
   async deleteVideo(exId){must(await sb.from('exercise_videos').delete().eq('exercise_id',exId))},
   async uploadVideo(path,file,type){const r=await sb.storage.from(VID_BUCKET).upload(path,file,{contentType:type,upsert:false,cacheControl:'3600'});if(r.error)throw r.error},

@@ -86,8 +86,8 @@ function netBanner(){
 }
 function shell(content){
   const nav=[['home','Início','home'],['workouts','Treinos','dumb'],['cycle','Ciclo','cycle'],['history','Histórico','chart'],['profile','Perfil','user']];
-  const b=n=>'<button class="'+(S.tab===n[0]?'on':'')+'" data-act="tab" data-v="'+n[0]+'"'+(S.tab===n[0]?' aria-current="page"':'')+'>'+ic(n[2])+'<span>'+n[1]+'</span></button>';
-  return '<div class="shell'+(S.view==='session'?' focus':'')+'"><aside class="side"><div class="brand"><span class="logo">CDS</span>Fitness</div>'+nav.map(b).join('')+'</aside><main><div class="mobilebrand"><div class="brand" style="margin:0"><span class="logo">CDS</span>Fitness</div></div>'+netBanner()+resumeBar()+content+'</main><nav class="bottom" aria-label="Navegação principal">'+nav.map(b).join('')+'</nav>'+vidSheet()+'</div>';
+  const b=n=>'<button class="'+(S.tab===n[0]?'on':'')+'" data-act="tab" data-v="'+n[0]+'"'+(S.tab===n[0]?' aria-current="page"':'')+'><span class="ico">'+ic(n[2])+(n[0]==='workouts'?shBadge(pendingCount()):'')+'</span><span>'+n[1]+'</span></button>';
+  return '<div class="shell'+(S.view==='session'?' focus':'')+'"><aside class="side"><div class="brand"><span class="logo">CDS</span>Fitness</div>'+nav.map(b).join('')+'</aside><main><div class="mobilebrand"><div class="brand" style="margin:0"><span class="logo">CDS</span>Fitness</div></div>'+netBanner()+resumeBar()+content+'</main><nav class="bottom" aria-label="Navegação principal">'+nav.map(b).join('')+'</nav>'+vidSheet()+shareSheet()+'</div>';
 }
 function bodyHtml(){
   if(S.boot==='loading')return vSplash();
@@ -105,7 +105,7 @@ function render(){
 }
 function softRender(){
   if(S.boot!=='ready'||!S.profile)return;
-  if(LOCK.includes(S.view)||S.ui.vSheet)return;
+  if(LOCK.includes(S.view)||S.ui.vSheet||S.ui.shSheet)return;
   render();
 }
 function go(view,o){o=o||{};if(view!==S.view)S.ui.vOpen=null;S.view=view;if(o.tab)S.tab=o.tab;S.top=true;render()}
